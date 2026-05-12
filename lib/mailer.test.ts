@@ -14,7 +14,7 @@ vi.mock('nodemailer', () => ({
   },
 }));
 
-import { escapeHtml, emailShell, emailButton, sendMail, sendMailFireAndForget } from './mailer';
+import { escapeHtml, emailShell, emailButton, sendMail, sendMailFireAndForget, hasInlineLogo } from './mailer';
 
 describe('escapeHtml', () => {
   it('replaces all five entity characters', () => {
@@ -36,11 +36,13 @@ describe('emailShell', () => {
     const html = emailShell('<p>hi</p>', 'Subject', 'http://h');
     expect(html).toContain('<!doctype html>');
     expect(html).toContain('<p>hi</p>');
-    expect(html).toContain('http://h/kosca-logo.png');
   });
-  it('omits the logo cell when appUrl is empty', () => {
-    const html = emailShell('<p>hi</p>', 'Subject');
-    expect(html).not.toContain('kosca-logo.png');
+  it('references the brand logo via cid (not an external URL) when available', () => {
+    const html = emailShell('<p>hi</p>', 'Subject', 'http://h');
+    // Logo is loaded from public/kosca-logo.png at module init; if present we
+    // reference it via cid, never via http(s) (so the email stays self-contained).
+    expect(html).not.toContain('http://h/kosca-logo.png');
+    if (hasInlineLogo()) expect(html).toContain('src="cid:kosca-logo"');
   });
   it('html-escapes the title', () => {
     expect(emailShell('', '<bad>')).toContain('&lt;bad&gt;');
@@ -80,5 +82,23 @@ describe('sendMail / sendMailFireAndForget', () => {
   it('sendMailFireAndForget never throws on send failure', () => {
     sendMailMock.mockRejectedValueOnce(new Error('smtp down'));
     expect(() => sendMailFireAndForget({ to: 'x', subject: 's', text: 't' })).not.toThrow();
+  });
+
+  it('attaches the brand logo inline (cid) for HTML mails', async () => {
+    if (!hasInlineLogo()) return; // logo file missing in this env — skip.
+    sendMailMock.mockResolvedValueOnce({ accepted: ['a@b'] });
+    await sendMail({ to: 'a@b', subject: 's', text: 't', html: '<p>x</p>' });
+    const call = sendMailMock.mock.calls[sendMailMock.mock.calls.length - 1][0];
+    expect(call.attachments).toBeTruthy();
+    expect(call.attachments[0]).toEqual(
+      expect.objectContaining({ cid: 'kosca-logo', contentDisposition: 'inline' }),
+    );
+  });
+
+  it('omits attachments for plain-text mails', async () => {
+    sendMailMock.mockResolvedValueOnce({ accepted: ['a@b'] });
+    await sendMail({ to: 'a@b', subject: 's', text: 't' });
+    const call = sendMailMock.mock.calls[sendMailMock.mock.calls.length - 1][0];
+    expect(call.attachments).toBeUndefined();
   });
 });

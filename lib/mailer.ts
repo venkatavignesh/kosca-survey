@@ -1,4 +1,34 @@
 import nodemailer from 'nodemailer';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+// Load the brand logo once at module init and inline it as a CID attachment on
+// every HTML mail. This is far more reliable than pointing the <img> at an
+// absolute URL: that approach breaks whenever APP_URL isn't reachable from the
+// recipient's mail client (private host, no public domain, auth gating, etc.).
+const LOGO_CID = 'kosca-logo';
+const LOGO_FILENAME = 'kosca-logo.png';
+let LOGO_BUFFER: Buffer | null = null;
+try {
+  LOGO_BUFFER = readFileSync(join(process.cwd(), 'public', LOGO_FILENAME));
+} catch {
+  LOGO_BUFFER = null;
+}
+
+export function hasInlineLogo(): boolean {
+  return LOGO_BUFFER !== null;
+}
+
+function inlineLogoAttachment() {
+  if (!LOGO_BUFFER) return null;
+  return {
+    filename: LOGO_FILENAME,
+    content: LOGO_BUFFER,
+    cid: LOGO_CID,
+    contentType: 'image/png',
+    contentDisposition: 'inline' as const,
+  };
+}
 
 // HTML-escape user-supplied values before splicing into email HTML so that
 // names like `O'Brien & <Co>` render correctly and don't break the markup.
@@ -15,12 +45,13 @@ export function escapeHtml(s: string | null | undefined): string {
 // Wrap a body fragment in a full Outlook-compatible HTML document with a
 // table-based 600px branded container. Use for ALL system emails.
 //
-// `appUrl` is needed to construct an absolute URL to the brand logo PNG
-// (Outlook strips data: URIs, so the logo must be served by Next.js).
-export function emailShell(innerHtml: string, title = 'Kosca', appUrl = ''): string {
-  const logoSrc = appUrl ? `${appUrl}/kosca-logo.png` : '';
-  const logoCell = logoSrc
-    ? `<img src="${escapeHtml(logoSrc)}" width="36" height="36" alt="Kosca" border="0" style="display:block;border:0;outline:none;width:36px;height:36px;" />`
+// The brand logo is referenced via `cid:kosca-logo` and inlined as an
+// attachment by sendMail (see inlineLogoAttachment). The legacy `appUrl`
+// argument is kept for callers but is no longer used for the logo.
+export function emailShell(innerHtml: string, title = 'Kosca', _appUrl = ''): string {
+  void _appUrl;
+  const logoCell = LOGO_BUFFER
+    ? `<img src="cid:${LOGO_CID}" width="36" height="36" alt="Kosca" border="0" style="display:block;border:0;outline:none;width:36px;height:36px;" />`
     : '';
   return `<!doctype html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
@@ -128,12 +159,16 @@ export async function sendMail(opts: {
 }) {
   const from = process.env.SMTP_FROM || 'no-reply@example.com';
   const transport = getTransport();
+  // Inline the brand logo as a CID attachment when the mail has an HTML part.
+  // Plain-text mails skip the attachment so they stay byte-for-byte minimal.
+  const logo = opts.html ? inlineLogoAttachment() : null;
   return transport.sendMail({
     from,
     to: opts.to,
     subject: opts.subject,
     text: opts.text,
     html: opts.html,
+    attachments: logo ? [logo] : undefined,
   });
 }
 
