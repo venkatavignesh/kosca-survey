@@ -36,6 +36,37 @@ services:
     networks:
       - default
 
+  # Nightly pg_dump sidecar — runs scripts/backup.sh at 02:00 IST and keeps
+  # the last BACKUP_RETENTION_DAYS in the survey_backups named volume.
+  # Brought into the prod compose file (was in docker-compose.dev.yml) so it
+  # ships with `docker compose up -d` and doesn't need a separate stack.
+  backup:
+    image: alpine:3.20
+    container_name: kosca_survey_backup
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Asia/Kolkata
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: "30"
+    volumes:
+      - ./scripts:/scripts:ro
+      - survey_backups:/backups
+    networks:
+      - default
+      - kosca_ar_system_default
+    command: >
+      sh -c "apk add --no-cache postgresql-client tzdata >/dev/null &&
+             cp /usr/share/zoneinfo/Asia/Kolkata /etc/localtime &&
+             echo Asia/Kolkata > /etc/timezone &&
+             printf '0 2 * * * /scripts/backup.sh >> /var/log/backup.log 2>&1\\n' > /etc/crontabs/root &&
+             touch /var/log/backup.log &&
+             crond -f -l 2 -L /var/log/backup.log &
+             tail -F /var/log/backup.log"
+
+volumes:
+  survey_backups:
+
 networks:
   kosca_ar_system_default:
     external: true
