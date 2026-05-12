@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/api';
+import { updateMaster, deleteMaster } from '@/lib/services/masters';
+import { ApiError } from '@/lib/errors';
 
 const Body = z.object({ name: z.string().min(1).max(100) });
 
@@ -9,14 +11,12 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const auth = await requireAdmin();
   if (auth.error) return auth.error;
   const { id } = await ctx.params;
-  const json = await req.json().catch(() => null);
-  const parsed = Body.safeParse(json);
+  const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'invalid input' }, { status: 400 });
   try {
-    const item = await prisma.department.update({ where: { id }, data: { name: parsed.data.name.trim() } });
-    return NextResponse.json(item);
-  } catch (e: any) {
-    if (e.code === 'P2002') return NextResponse.json({ error: 'already exists' }, { status: 409 });
+    return NextResponse.json(await updateMaster('department', id, parsed.data.name, auth.session.user.id, auth.session.user.email));
+  } catch (e) {
+    if (e instanceof ApiError) return NextResponse.json({ error: e.message }, { status: e.status });
     throw e;
   }
 }
@@ -27,6 +27,11 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   const { id } = await ctx.params;
   const count = await prisma.employee.count({ where: { departmentId: id } });
   if (count > 0) return NextResponse.json({ error: `cannot delete: ${count} employees attached` }, { status: 409 });
-  await prisma.department.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  try {
+    await deleteMaster('department', id, auth.session.user.id, auth.session.user.email);
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    if (e instanceof ApiError) return NextResponse.json({ error: e.message }, { status: e.status });
+    throw e;
+  }
 }
