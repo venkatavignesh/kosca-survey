@@ -34,7 +34,7 @@ export default async function SurveyFormPage(props: { params: Promise<{ token: s
 
   return (
     <div className="space-y-4">
-      <div className="card">
+      <div className="card text-center">
         <h1 className="text-xl font-semibold">{a.campaign.title}</h1>
         {a.campaign.description && <p className="text-sm text-[color:var(--text-primary)] mt-3 whitespace-pre-wrap">{a.campaign.description}</p>}
         {a.campaign.deadline && <p className="text-xs text-[color:var(--status-warn-text)] mt-2">Submit by {formatDate(a.campaign.deadline)}</p>}
