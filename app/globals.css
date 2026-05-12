@@ -1,0 +1,317 @@
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Kosca Design System — tokens (see docs/design-system.md §2)
+   Every visual color is a CSS custom property. Adding a new color requires
+   adding BOTH a light and dark value.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  color-scheme: light;
+
+  --page-bg: #f0eff9;
+  --header-bg: #dddcf2;
+  --header-border: #b8b3e3;
+
+  --surface-primary: #ffffff;
+  --surface-secondary: #f8fafc;
+  --surface-tertiary: #f0eff9;
+
+  --text-primary: #111827;
+  --text-secondary: #312d63;
+  --text-tertiary: #3d3878;
+  --text-muted: #9188d4;
+  --text-light: #6b7280;
+
+  --border-primary: #e5e7eb;
+  --border-secondary: #b8b3e3;
+  --border-subtle: #f1f5f9;
+
+  --accent-primary: #4d47a8;
+  --accent-secondary: #6b5fc4;
+  --accent-hover: #c9c5e8;
+  --accent-gradient-from: #4d47a8;
+  --accent-gradient-to: #3d3878;
+
+  --nav-active-bg: #4d47a8;
+  --nav-active-text: #ffffff;
+
+  --dropdown-bg: #ffffff;
+  --dropdown-border: #f3f4f6;
+  --dropdown-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  --dropdown-hover: #f9fafb;
+  --dropdown-active-bg: #f5f3ff;
+  --dropdown-active-text: #6d28d9;
+  --dropdown-divider: #f3f4f6;
+
+  --table-header-bg: #312d63;
+  --table-total-bg: #dddcf2;
+  --table-row-hover: #f8fafc;
+  --table-row-alt: #f3f4f6;
+
+  --scrollbar-thumb: #e2e8f0;
+
+  --input-bg: #ffffff;
+  --input-border: #e5e7eb;
+  --input-text: #111827;
+
+  --badge-bg: #f0eff9;
+  --badge-text: #4d47a8;
+
+  /* Semantic status pairs (§5 status pill / badge / banner) */
+  --status-success-bg: #ecfdf5;
+  --status-success-text: #047857;
+  --status-success-border: #a7f3d0;
+  --status-info-bg: #eff6ff;
+  --status-info-text: #1d4ed8;
+  --status-info-border: #bfdbfe;
+  --status-warn-bg: #fffbeb;
+  --status-warn-text: #b45309;
+  --status-warn-border: #fde68a;
+  --status-danger-bg: #fef2f2;
+  --status-danger-text: #b91c1c;
+  --status-danger-border: #fecaca;
+  --status-neutral-bg: #f1f5f9;
+  --status-neutral-text: #334155;
+  --status-neutral-border: #e2e8f0;
+
+  --error-text: #dc2626;
+}
+
+html.dark {
+  color-scheme: dark;
+
+  --page-bg: #1e2230;
+  --header-bg: #282d3c;
+  --header-border: #3a4052;
+
+  --surface-primary: #242838;
+  --surface-secondary: #1e2230;
+  --surface-tertiary: #2e3342;
+
+  --text-primary: #c8cdd6;
+  --text-secondary: #9da5b4;
+  --text-tertiary: #a6aebb;
+  --text-muted: #6c7686;
+  --text-light: #6c7686;
+
+  --border-primary: #343a4a;
+  --border-secondary: #3e4456;
+  --border-subtle: #2a2f3e;
+
+  --accent-primary: #9892d6;
+  --accent-secondary: #aca6e2;
+  --accent-hover: #2e3342;
+  --accent-gradient-from: #9892d6;
+  --accent-gradient-to: #7a74c2;
+
+  --nav-active-bg: #9892d6;
+  --nav-active-text: #ffffff;
+
+  --dropdown-bg: #282d3c;
+  --dropdown-border: #3a4052;
+  --dropdown-shadow: 0 8px 24px rgba(0, 0, 0, 0.20);
+  --dropdown-hover: #313744;
+  --dropdown-active-bg: #33304e;
+  --dropdown-active-text: #c4bef0;
+  --dropdown-divider: #3a4052;
+
+  --table-header-bg: #282d3c;
+  --table-total-bg: #2e3342;
+  --table-row-hover: #2a2f3e;
+  --table-row-alt: #232838;
+
+  --scrollbar-thumb: #3e4456;
+
+  --input-bg: #282d3c;
+  --input-border: #3a4052;
+  --input-text: #c8cdd6;
+
+  --badge-bg: #2e3342;
+  --badge-text: #c4bef0;
+
+  --status-success-bg: rgba(16, 185, 129, 0.16);
+  --status-success-text: #6ee7b7;
+  --status-success-border: rgba(16, 185, 129, 0.40);
+  --status-info-bg: rgba(59, 130, 246, 0.18);
+  --status-info-text: #93c5fd;
+  --status-info-border: rgba(59, 130, 246, 0.42);
+  --status-warn-bg: rgba(245, 158, 11, 0.18);
+  --status-warn-text: #fcd34d;
+  --status-warn-border: rgba(245, 158, 11, 0.42);
+  --status-danger-bg: rgba(239, 68, 68, 0.18);
+  --status-danger-text: #fca5a5;
+  --status-danger-border: rgba(239, 68, 68, 0.42);
+  --status-neutral-bg: #2a2f3e;
+  --status-neutral-text: #c8cdd6;
+  --status-neutral-border: #3a4052;
+
+  --error-text: #f87171;
+}
+
+@media print {
+  :root {
+    --page-bg: #ffffff;
+    --header-bg: #dddcf2;
+    --surface-primary: #ffffff;
+    --text-primary: #111827;
+    --text-secondary: #312d63;
+    --text-tertiary: #3d3878;
+    --border-primary: #e5e7eb;
+  }
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: var(--page-bg);
+  color: var(--text-primary);
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Skip-link (§9) — visually hidden until keyboard-focused.
+   Every property is !important so no Tailwind utility / cascade overrides
+   the hidden state on initial render. */
+.skip-link {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.skip-link:focus {
+  position: absolute !important;
+  top: 8px !important;
+  left: 8px !important;
+  z-index: 100 !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+  padding: 8px 12px !important;
+  background: var(--accent-primary) !important;
+  color: #fff !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+}
+
+/* Custom scrollbar */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 6px; }
+
+@layer components {
+  /* Buttons (§5)
+     All variants share the same box model so they line up cleanly when placed
+     side-by-side: same padding, same `border` (1px), same line-height. The
+     border-color flips from accent (primary/danger) to neutral (secondary).
+     Colors are set explicitly (not via @apply text-white) so Tailwind v4 +
+     Turbopack can't drop them during component-layer compilation. */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-semibold leading-5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: #ffffff;
+  }
+  .btn:hover:not(:disabled) { background: var(--accent-secondary); border-color: var(--accent-secondary); }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium leading-5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    background: var(--surface-primary);
+    color: var(--text-primary);
+    border-color: var(--border-primary);
+  }
+  .btn-secondary:hover:not(:disabled) { background: var(--accent-hover); }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-semibold leading-5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    background: #dc2626;
+    border-color: #dc2626;
+    color: #ffffff;
+  }
+  .btn-danger:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; }
+
+  /* Form input (§5) */
+  .input {
+    @apply block w-full rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-inset;
+    background: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+  }
+  .input:focus { --tw-ring-color: var(--accent-primary); border-color: var(--accent-primary); }
+
+  .label {
+    @apply block text-sm font-semibold mb-1;
+    color: var(--text-secondary);
+  }
+
+  /* Card (§5) */
+  .card {
+    @apply rounded-xl border p-6 shadow-sm;
+    background: var(--surface-primary);
+    border-color: var(--border-primary);
+  }
+
+  /* Table (§5) */
+  .table {
+    @apply min-w-full text-sm;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .table thead tr {
+    background: radial-gradient(ellipse at top left, var(--accent-secondary), var(--accent-primary) 50%, var(--table-header-bg));
+  }
+  .table th {
+    @apply px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-wider;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.92);
+  }
+  .table td {
+    @apply px-3 py-2 align-middle text-center;
+    color: var(--text-primary);
+    border-top: 1px solid var(--border-primary);
+    border-right: 1px solid var(--border-primary);
+  }
+  .table td:last-child { border-right: 0; }
+  .table th + th { border-left: 1px solid rgba(255, 255, 255, 0.18); }
+  .table tbody tr:nth-child(even) td { background: var(--table-row-alt); }
+  .table tbody tr:hover td { background: var(--table-row-hover); }
+
+  /* Badge (§5) */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold;
+    background: var(--badge-bg);
+    color: var(--badge-text);
+  }
+
+  /* Semantic status pills (§5) — use these instead of bg-*-100 text-*-800 */
+  .pill-success { background: var(--status-success-bg); color: var(--status-success-text); box-shadow: inset 0 0 0 1px var(--status-success-border); }
+  .pill-info    { background: var(--status-info-bg);    color: var(--status-info-text);    box-shadow: inset 0 0 0 1px var(--status-info-border); }
+  .pill-warn    { background: var(--status-warn-bg);    color: var(--status-warn-text);    box-shadow: inset 0 0 0 1px var(--status-warn-border); }
+  .pill-danger  { background: var(--status-danger-bg);  color: var(--status-danger-text);  box-shadow: inset 0 0 0 1px var(--status-danger-border); }
+  .pill-neutral { background: var(--status-neutral-bg); color: var(--status-neutral-text); box-shadow: inset 0 0 0 1px var(--status-neutral-border); }
+
+  /* Banner (§5 flash banner — server-rendered) */
+  .banner-success { background: var(--status-success-bg); color: var(--status-success-text); border: 1px solid var(--status-success-border); }
+  .banner-info    { background: var(--status-info-bg);    color: var(--status-info-text);    border: 1px solid var(--status-info-border); }
+  .banner-warn    { background: var(--status-warn-bg);    color: var(--status-warn-text);    border: 1px solid var(--status-warn-border); }
+  .banner-danger  { background: var(--status-danger-bg);  color: var(--status-danger-text);  border: 1px solid var(--status-danger-border); }
+
+  /* Inline form error (§5: text-[11px], placed below input) */
+  .form-error {
+    @apply mt-2 text-[11px];
+    color: var(--error-text);
+  }
+}

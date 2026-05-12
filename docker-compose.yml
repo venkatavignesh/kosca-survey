@@ -1,0 +1,41 @@
+services:
+  app:
+    build: .
+    image: kosca_survey:latest
+    container_name: kosca_survey
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DB_HOST: kosca_db
+      DB_PORT: "5432"
+      DB_USER: ${SURVEY_DB_USER:-survey_app}
+      TZ: Asia/Kolkata
+    ports:
+      - "3002:3000"
+    networks:
+      - default
+      - kosca_ar_system_default
+
+  cron:
+    image: alpine:3.20
+    container_name: kosca_survey_cron
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Asia/Kolkata
+    depends_on:
+      - app
+    command: >
+      sh -c "apk add --no-cache curl tzdata >/dev/null &&
+             cp /usr/share/zoneinfo/Asia/Kolkata /etc/localtime &&
+             echo Asia/Kolkata > /etc/timezone &&
+             printf '30 9 * * * curl -fsS -m 600 -X POST -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/daily-reminders >> /var/log/cron.log 2>&1\\n' > /etc/crontabs/root &&
+             touch /var/log/cron.log &&
+             crond -f -l 2 -L /var/log/cron.log &
+             tail -F /var/log/cron.log"
+    networks:
+      - default
+
+networks:
+  kosca_ar_system_default:
+    external: true
