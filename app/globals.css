@@ -314,5 +314,16 @@ body {
     @apply mt-2 text-[11px];
     color: var(--error-text);
   }
+
+}
+
+/* Required-but-empty question highlight — outside @layer so it wins over .card.
+   Applied only on Next/Submit when the user leaves a required question blank,
+   and cleared the moment they start answering it. */
+.card.card-missing {
+  border-color: #dc2626 !important;
+  border-width: 2px !important;
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.25), 0 0 12px rgba(220, 38, 38, 0.35) !important;
+  transition: box-shadow 180ms ease, border-color 180ms ease;
 }
 

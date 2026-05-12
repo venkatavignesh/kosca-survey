@@ -23,6 +23,7 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [missingIds, setMissingIds] = useState<Set<string>>(new Set());
 
   const totalPages = Math.max(1, Math.ceil(questions.length / PER_PAGE));
   const safePage = Math.min(Math.max(1, page), totalPages);
@@ -35,19 +36,31 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
   // page where Q11 isn't even shown.
   useEffect(() => {
     setErr(null);
+    setMissingIds(new Set());
   }, [safePage]);
 
+  function clearMissing(qid: string) {
+    setMissingIds((s) => {
+      if (!s.has(qid)) return s;
+      const next = new Set(s);
+      next.delete(qid);
+      return next;
+    });
+  }
   function setText(qid: string, v: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueText: v } }));
     setErr(null);
+    clearMissing(qid);
   }
   function setComment(qid: string, v: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueText: v } }));
     setErr(null);
+    clearMissing(qid);
   }
   function setSingle(qid: string, opt: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueOptions: [opt] } }));
     setErr(null);
+    clearMissing(qid);
   }
   function toggleMulti(qid: string, opt: string) {
     setAnswers((a) => {
@@ -56,47 +69,60 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
       return { ...a, [qid]: { ...a[qid], valueOptions: next } };
     });
     setErr(null);
+    clearMissing(qid);
   }
 
-  // Returns the 1-based index of the first unanswered required question in
-  // the given scope, or 0 if everything is satisfied. textRequired (comment)
-  // is enforced independently of the primary required flag.
-  function firstMissingRequired(scope: Q[]): number {
-    for (let i = 0; i < scope.length; i++) {
-      const q = scope[i];
+  // Returns the IDs of unanswered required questions in the given scope.
+  // textRequired (comment) is enforced independently of the primary required flag.
+  function allMissingRequired(scope: Q[]): string[] {
+    const out: string[] = [];
+    for (const q of scope) {
       const a = answers[q.id];
       const isText = q.type === 'TEXT' || q.type === 'LONG_TEXT';
+      let missing = false;
       if (q.required) {
         if (isText) {
-          if (!a?.valueText || !a.valueText.trim()) return i + 1;
+          if (!a?.valueText || !a.valueText.trim()) missing = true;
         } else if (!a?.valueOptions || a.valueOptions.length === 0) {
-          return i + 1;
+          missing = true;
         }
       }
-      if (q.allowText && q.textRequired) {
-        if (!a?.valueText || !a.valueText.trim()) return i + 1;
+      if (!missing && q.allowText && q.textRequired) {
+        if (!a?.valueText || !a.valueText.trim()) missing = true;
       }
+      if (missing) out.push(q.id);
     }
-    return 0;
+    return out;
   }
 
   function scrollToQuestion(qid: string) {
     if (typeof window === 'undefined') return;
+    // Two RAFs: first lets React commit the state (card-missing class added),
+    // second runs after the browser has laid out the new styles so the element's
+    // position is final before we scroll.
     requestAnimationFrame(() => {
-      document.getElementById(`q-${qid}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`q-${qid}`);
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const y = window.scrollY + rect.top - 100;
+        window.scrollTo({ top: y, left: 0, behavior: 'smooth' });
+      });
     });
   }
 
   function goNext() {
     setErr(null);
     // Validate ONLY the current page — never peek at the next page's questions.
-    const missing = firstMissingRequired(slice);
-    if (missing) {
-      const q = slice[missing - 1];
-      setErr(`Please answer question ${startIdx + missing} before continuing.`);
-      scrollToQuestion(q.id);
+    const missingList = allMissingRequired(slice);
+    if (missingList.length > 0) {
+      setMissingIds(new Set(missingList));
+      const firstIdx = slice.findIndex((q) => q.id === missingList[0]);
+      setErr(`Please answer question ${startIdx + firstIdx + 1} before continuing.`);
+      scrollToQuestion(missingList[0]);
       return;
     }
+    setMissingIds(new Set());
     // Defer the page advance to the next tick so the browser fully completes
     // the in-flight click event (incl. its default action) before React swaps
     // this Next button for the Submit button. Without this, React's
@@ -107,14 +133,22 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
     // error on page 2 the moment it loads.
     setTimeout(() => {
       setPage(safePage + 1);
-      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
     }, 0);
   }
 
   function goPrev() {
     setErr(null);
     setPage(safePage - 1);
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
   }
 
   async function submit(e: React.FormEvent) {
@@ -122,13 +156,15 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
     setErr(null);
     // Validate ONLY the current (last) page on submit. Earlier pages were
     // already gated by goNext, so by construction they're complete.
-    const missing = firstMissingRequired(slice);
-    if (missing) {
-      const q = slice[missing - 1];
-      setErr(`Please answer question ${startIdx + missing} before submitting.`);
-      scrollToQuestion(q.id);
+    const missingList = allMissingRequired(slice);
+    if (missingList.length > 0) {
+      setMissingIds(new Set(missingList));
+      const firstIdx = slice.findIndex((q) => q.id === missingList[0]);
+      setErr(`Please answer question ${startIdx + firstIdx + 1} before submitting.`);
+      scrollToQuestion(missingList[0]);
       return;
     }
+    setMissingIds(new Set());
     setBusy(true);
     const payload = {
       answers: questions.map((q) => ({
@@ -176,7 +212,7 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
       {slice.map((q, idx) => {
         const i = startIdx + idx;
         return (
-          <div key={q.id} id={`q-${q.id}`} className="card space-y-3">
+          <div key={q.id} id={`q-${q.id}`} className={`card space-y-3${missingIds.has(q.id) ? ' card-missing' : ''}`}>
             <div className="font-medium">
               {i + 1}. {q.text} {q.required && <span className="text-[color:var(--error-text)]">*</span>}
             </div>
