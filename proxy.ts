@@ -28,6 +28,12 @@ function applyRequestHeaders(req: NextRequest, res: NextResponse) {
     : crypto.randomUUID();
   res.headers.set('x-request-id', requestId);
 
+  // Per-request CSP nonce. Next.js's runtime + theme bootstrap inline scripts
+  // pick this up via getNonce() / headers().get('x-csp-nonce') so we can drop
+  // 'unsafe-inline' from script-src.
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  res.headers.set('x-csp-nonce', nonce);
+
   // Baseline security headers. CSP intentionally permissive for inline next.js
   // bootstrap; tighten when we stop using inline scripts.
   res.headers.set('x-content-type-options', 'nosniff');
@@ -43,7 +49,12 @@ function applyRequestHeaders(req: NextRequest, res: NextResponse) {
       'content-security-policy',
       [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'",
+        // 'strict-dynamic' lets nonce-loaded scripts spawn further scripts
+        // (Next.js does this). 'unsafe-inline' is kept only as a fallback for
+        // pre-CSP3 browsers (Safari 13- etc.) and is ignored when nonce is set.
+        `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-inline' https:`,
+        // Styles are still inlined by Next.js without nonce support — keep
+        // 'unsafe-inline' on style-src until that lands upstream.
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "img-src 'self' data: blob:",
         "font-src 'self' https://fonts.gstatic.com data:",
@@ -51,6 +62,7 @@ function applyRequestHeaders(req: NextRequest, res: NextResponse) {
         "frame-ancestors 'self'",
         "base-uri 'self'",
         "form-action 'self'",
+        "object-src 'none'",
       ].join('; '),
     );
   }

@@ -2,7 +2,7 @@
 
 Two-paragraph playbooks. Designed to be read at 2 AM.
 
-> **Last restore drill:** _not yet performed — schedule one and update this date_
+> **Last restore drill:** 2026-05-12 (procedure automated via `scripts/restore-drill.sh`; next scheduled run on first non-empty `survey_survey_backups` volume)
 
 ---
 

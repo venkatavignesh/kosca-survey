@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1.6
 FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS deps
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl=3.5.6-r0
 COPY package.json package-lock.json* ./
 RUN --mount=type=cache,target=/root/.npm \
     if [ -f package-lock.json ]; then npm ci --prefer-offline; else npm install --prefer-offline; fi
 
 FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS builder
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl=3.5.6-r0
 COPY --from=deps /app/node_modules ./node_modules
 COPY prisma ./prisma
 RUN npx prisma generate
@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/root/.npm \
 # ---- Runner ----
 FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS runner
 WORKDIR /app
-RUN apk add --no-cache libc6-compat openssl postgresql-client tini bash tzdata \
+RUN apk add --no-cache libc6-compat openssl=3.5.6-r0 postgresql18-client=18.3-r0 tini=0.19.0-r3 bash=5.3.3-r1 tzdata=2026b-r0 \
  && cp /usr/share/zoneinfo/Asia/Kolkata /etc/localtime \
  && echo Asia/Kolkata > /etc/timezone
 ENV NODE_ENV=production

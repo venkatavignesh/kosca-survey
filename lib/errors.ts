@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { headers } from 'next/headers';
 import { logger } from './logger';
+import { reportError } from './error-sink';
 
 // Standard error envelope. Every API route should return errors via these
 // helpers so clients can switch on `code` (not parse a freeform message).
@@ -72,7 +73,15 @@ export function apiHandler<Ctx>(
           { status: 400 },
         );
       }
-      logger.error({ err, requestId: rid, path: new URL(req.url).pathname }, 'unhandled api error');
+      const path = new URL(req.url).pathname;
+      logger.error({ err, requestId: rid, path }, 'unhandled api error');
+      reportError({
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+        requestId: rid,
+        path,
+        level: 'error',
+      });
       return NextResponse.json(
         { error: { code: 'INTERNAL', message: 'Internal server error', requestId: rid } },
         { status: 500 },

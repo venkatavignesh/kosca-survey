@@ -115,6 +115,59 @@ describe('getQuestionReport', () => {
   });
 });
 
+describe('getQuestionReport — more branches', () => {
+  it('returns null question when questionId not in campaign', async () => {
+    campaignFindUnique.mockResolvedValueOnce(baseCampaign());
+    const r = await getQuestionReport('c1', { questionId: 'unknown' });
+    expect(r?.question).toBeNull();
+  });
+
+  it('text-question textQuery filter narrows matches case-insensitively', async () => {
+    campaignFindUnique.mockResolvedValueOnce(baseCampaign({
+      questions: [
+        {
+          groupId: null, order: 0,
+          question: { id: 'qt', text: 'Open Q', type: 'LONG_TEXT', options: null, allowText: false },
+        },
+      ],
+    }));
+    assignmentFindMany.mockResolvedValueOnce([
+      {
+        id: 'a1', submittedAt: new Date(),
+        employee: { empCode: 'E1', name: 'A', email: '', designation: '',
+          location: { name: '' }, officeType: { name: '' }, department: { name: '' } },
+        response: { answers: [{ questionId: 'qt', valueOptions: null, valueText: 'Manager is GREAT' }] },
+      },
+      {
+        id: 'a2', submittedAt: new Date(),
+        employee: { empCode: 'E2', name: 'B', email: '', designation: '',
+          location: { name: '' }, officeType: { name: '' }, department: { name: '' } },
+        response: { answers: [{ questionId: 'qt', valueOptions: null, valueText: 'meh' }] },
+      },
+    ]);
+    const r = await getQuestionReport('c1', { questionId: 'qt', textQuery: 'great' });
+    expect(r?.matches.map((m) => m.empCode)).toEqual(['E1']);
+  });
+
+  it('skips assignments with no answer / empty selection', async () => {
+    campaignFindUnique.mockResolvedValueOnce(baseCampaign());
+    assignmentFindMany.mockResolvedValueOnce([
+      { id: 'a1', submittedAt: new Date(),
+        employee: { empCode: 'E1', name: 'A', email: '', designation: '',
+          location: { name: '' }, officeType: { name: '' }, department: { name: '' } },
+        response: null,
+      },
+      { id: 'a2', submittedAt: new Date(),
+        employee: { empCode: 'E2', name: 'B', email: '', designation: '',
+          location: { name: '' }, officeType: { name: '' }, department: { name: '' } },
+        response: { answers: [{ questionId: 'q1', valueOptions: [], valueText: '   ' }] },
+      },
+    ]);
+    const r = await getQuestionReport('c1', { questionId: 'q1' });
+    expect(r?.totalAnswered).toBe(0);
+  });
+});
+
 describe('getGroupReports', () => {
   it('returns [] when campaign missing', async () => {
     campaignFindUnique.mockResolvedValueOnce(null);

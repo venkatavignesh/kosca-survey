@@ -52,7 +52,7 @@ services:
       sh -c "apk add --no-cache curl tzdata >/dev/null &&
              cp /usr/share/zoneinfo/Asia/Kolkata /etc/localtime &&
              echo Asia/Kolkata > /etc/timezone &&
-             printf '30 9 * * * curl -fsS -m 600 -X POST -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/daily-reminders >> /var/log/cron.log 2>&1\\n' > /etc/crontabs/root &&
+             printf '30 9 * * * curl -fsS -m 600 -X POST -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/daily-reminders >> /var/log/cron.log 2>&1\\n*/5 * * * * curl -fsS -m 30 -X POST -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/internal/alert-check >> /var/log/cron.log 2>&1\\n' > /etc/crontabs/root &&
              touch /var/log/cron.log &&
              crond -f -l 2 -L /var/log/cron.log &
              tail -F /var/log/cron.log"

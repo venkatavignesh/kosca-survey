@@ -1,0 +1,66 @@
+name: Nightly load test
+
+on:
+  schedule:
+    - cron: '0 19 * * *'   # 00:30 IST — outside business hours
+  workflow_dispatch:
+
+jobs:
+  k6:
+    runs-on: ubuntu-latest
+    env:
+      NEXTAUTH_SECRET: ci_dummy_secret_at_least_32_chars_long_xx
+      NEXTAUTH_URL: http://localhost:3000
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci?schema=public
+      SMTP_HOST: localhost
+      SMTP_PORT: '1025'
+      SMTP_USER: ci
+      SMTP_PASS: ci
+      MAIL_FROM: ci@example.com
+      CRON_SECRET: ci-cron-secret
+      NEXT_TELEMETRY_DISABLED: '1'
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx prisma migrate deploy
+      - run: npm run build
+      - name: Start app
+        run: |
+          nohup npm start > app.log 2>&1 &
+          for i in {1..30}; do
+            if curl -sf http://localhost:3000/api/health/live; then echo ready; break; fi
+            sleep 1
+          done
+      - name: Install k6
+        run: |
+          curl -fsS https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y k6
+      - name: Run smoke
+        run: BASE_URL=http://localhost:3000 k6 run tests/loadtest/smoke.js --summary-export=k6-summary.json
+      - name: Upload k6 results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-summary
+          path: k6-summary.json
+      - name: Tail app log on failure
+        if: failure()
+        run: tail -200 app.log
