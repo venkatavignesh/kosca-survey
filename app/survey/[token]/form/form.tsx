@@ -97,8 +97,18 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
       scrollToQuestion(q.id);
       return;
     }
-    setPage(safePage + 1);
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Defer the page advance to the next tick so the browser fully completes
+    // the in-flight click event (incl. its default action) before React swaps
+    // this Next button for the Submit button. Without this, React's
+    // synchronous commit inside the click handler can change the live
+    // button's type to "submit" mid-event, causing the browser to auto-fire
+    // a form submission on the freshly-rendered submit button — which would
+    // then trigger our validation and flash a stale "answer question 11"
+    // error on page 2 the moment it loads.
+    setTimeout(() => {
+      setPage(safePage + 1);
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 0);
   }
 
   function goPrev() {
@@ -236,11 +246,11 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
           {safePage} / {totalPages}
         </span>
         {isLastPage ? (
-          <button type="submit" className="btn" disabled={busy}>
+          <button key="submit-btn" type="submit" className="btn" disabled={busy}>
             {busy ? 'Submitting…' : 'Submit responses'}
           </button>
         ) : (
-          <button type="button" className="btn" onClick={goNext} disabled={busy}>
+          <button key="next-btn" type="button" className="btn" onClick={goNext} disabled={busy}>
             Next →
           </button>
         )}
