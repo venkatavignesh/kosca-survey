@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  HR
+}
+
+enum QuestionType {
+  RADIO
+  CHECKBOX
+  MCQ_SINGLE
+  MCQ_MULTI
+  TEXT
+  LONG_TEXT
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+enum Audience {
+  ALL
+  SPECIFIC
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String
+  name                String
+  role                Role
+  mustChangePassword  Boolean   @default(true)
+  passwordChangedAt   DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  campaigns           Campaign[]
+}
+
+model Location {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+
+  employees Employee[]
+}
+
+model OfficeType {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+
+  employees Employee[]
+}
+
+model Department {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+
+  employees Employee[]
+}
+
+model Employee {
+  id            String   @id @default(cuid())
+  empCode       String   @unique
+  name          String
+  // Not unique: multiple employees can share a mailbox (e.g. warehouse staff
+  // who all read ops@kosca.in). The per-employee token in the survey URL is
+  // what binds an OTP/response to the correct empCode.
+  email         String
+  designation   String
+  locationId    String
+  officeTypeId  String
+  departmentId  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  location      Location    @relation(fields: [locationId], references: [id])
+  officeType    OfficeType  @relation(fields: [officeTypeId], references: [id])
+  department    Department  @relation(fields: [departmentId], references: [id])
+
+  assignments   CampaignAssignment[]
+  questionTargets CampaignQuestionEmployee[]
+
+  @@index([locationId])
+  @@index([officeTypeId])
+  @@index([departmentId])
+}
+
+model Question {
+  id           String       @id @default(cuid())
+  text         String
+  type         QuestionType
+  options      Json?
+  required     Boolean      @default(false)
+  allowText    Boolean      @default(false)
+  textRequired Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  campaignQuestions CampaignQuestion[]
+  answers           Answer[]
+}
+
+model Campaign {
+  id                   String         @id @default(cuid())
+  title                String
+  description          String?
+  emailSubjectTemplate String
+  emailBodyTemplate    String
+  status               CampaignStatus @default(DRAFT)
+  deadline             DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  createdById          String
+
+  createdBy            User           @relation(fields: [createdById], references: [id])
+
+  assignments          CampaignAssignment[]
+  questions            CampaignQuestion[]
+  questionGroups       CampaignQuestionGroup[]
+}
+
+model CampaignQuestionGroup {
+  id         String   @id @default(cuid())
+  campaignId String
+  name       String
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  campaign  Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  questions CampaignQuestion[]
+
+  @@unique([campaignId, name])
+  @@index([campaignId])
+}
+
+model CampaignAssignment {
+  id                 String    @id @default(cuid())
+  campaignId         String
+  employeeId         String
+  token              String    @unique
+  emailConfirmCode   String?
+  confirmCodeSentAt  DateTime?
+  emailSentAt        DateTime?
+  emailOpenedAt      DateTime?
+  reminderCount      Int       @default(0)
+  lastReminderSentAt DateTime?
+  lastAutoReminderAt DateTime?
+  openedAt           DateTime?
+  confirmedAt        DateTime?
+  submittedAt        DateTime?
+  confirmAttempts    Int       @default(0)
+  createdAt          DateTime  @default(now())
+
+  campaign         Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  employee         Employee  @relation(fields: [employeeId], references: [id])
+  response         Response?
+
+  @@unique([campaignId, employeeId])
+  @@index([token])
+  @@index([campaignId, submittedAt])
+  @@index([employeeId])
+}
+
+model CampaignQuestion {
+  id          String     @id @default(cuid())
+  campaignId  String
+  questionId  String
+  order       Int        @default(0)
+  audience    Audience   @default(ALL)
+  groupId     String?
+  createdAt   DateTime   @default(now())
+
+  campaign    Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  question    Question   @relation(fields: [questionId], references: [id])
+  group       CampaignQuestionGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  targets     CampaignQuestionEmployee[]
+
+  @@unique([campaignId, questionId])
+  @@index([campaignId])
+  @@index([groupId])
+}
+
+model CampaignQuestionEmployee {
+  id                  String    @id @default(cuid())
+  campaignQuestionId  String
+  employeeId          String
+
+  campaignQuestion    CampaignQuestion @relation(fields: [campaignQuestionId], references: [id], onDelete: Cascade)
+  employee            Employee         @relation(fields: [employeeId], references: [id])
+
+  @@unique([campaignQuestionId, employeeId])
+  @@index([employeeId])
+}
+
+model Response {
+  id           String   @id @default(cuid())
+  assignmentId String   @unique
+  submittedAt  DateTime @default(now())
+
+  assignment   CampaignAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  answers      Answer[]
+}
+
+model Answer {
+  id           String   @id @default(cuid())
+  responseId   String
+  questionId   String
+  valueText    String?
+  valueOptions Json?
+
+  response     Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  question     Question @relation(fields: [questionId], references: [id])
+
+  @@unique([responseId, questionId])
+  @@index([questionId])
+}
+
+// Append-only record of admin state-changing actions. Indexed for the three
+// dimensions an auditor cares about: who, what, target.
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  actorEmail String?
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   Json?
+  requestId  String?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId, createdAt])
+}
