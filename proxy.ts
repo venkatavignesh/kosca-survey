@@ -66,11 +66,18 @@ function applyRequestHeaders(req: NextRequest, res: NextResponse) {
       ].join('; '),
     );
   }
-  // Cross-origin protections. CORP=same-site (not same-origin) so Next.js
-  // App Router RSC fetches across LAN-IP / localhost still work — full
-  // same-origin breaks the segment-cache prefetch in dev.
   res.headers.set('cross-origin-opener-policy', 'same-origin-allow-popups');
-  res.headers.set('cross-origin-resource-policy', 'same-site');
+  // CORP defaults to same-site for HTML / API responses but is relaxed to
+  // 'cross-origin' on public assets so:
+  //  - Gmail's image proxy (googleusercontent.com) can fetch the logo
+  //    embedded in invite emails
+  //  - The email-open tracking pixel works from any client
+  const publicAssetPaths = new Set(['/kosca-logo.png', '/favicon.ico', '/theme-bootstrap.js']);
+  const isPublicAsset =
+    publicAssetPaths.has(req.nextUrl.pathname) ||
+    req.nextUrl.pathname.startsWith('/_next/image') ||
+    req.nextUrl.pathname.startsWith('/api/track/');
+  res.headers.set('cross-origin-resource-policy', isPublicAsset ? 'cross-origin' : 'same-site');
   return res;
 }
 
