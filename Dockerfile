@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.6
-FROM node:22-alpine AS deps
+FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 COPY package.json package-lock.json* ./
 RUN --mount=type=cache,target=/root/.npm \
     if [ -f package-lock.json ]; then npm ci --prefer-offline; else npm install --prefer-offline; fi
 
-FROM node:22-alpine AS builder
+FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS builder
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl
 COPY --from=deps /app/node_modules ./node_modules
@@ -18,7 +18,7 @@ RUN npm run build
 
 # ---- Tools stage: prisma + tsx + bcryptjs for migrate/seed at runtime ----
 # Built independently of source so it's cached across normal code changes.
-FROM node:22-alpine AS tools
+FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS tools
 WORKDIR /tools
 RUN --mount=type=cache,target=/root/.npm \
     npm init -y >/dev/null \
@@ -27,7 +27,7 @@ RUN --mount=type=cache,target=/root/.npm \
       pg@8.20.0 tsx@4.21.0 bcryptjs@3.0.3 dotenv@17.4.2
 
 # ---- Runner ----
-FROM node:22-alpine AS runner
+FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS runner
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl postgresql-client tini bash tzdata \
  && cp /usr/share/zoneinfo/Asia/Kolkata /etc/localtime \

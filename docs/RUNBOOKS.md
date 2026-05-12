@@ -75,9 +75,31 @@ If genuine abuse: nothing to do — the limiter is working. If a real user, bump
 
 ---
 
+## Rollback to previous deploy
+
+```sh
+cd /home/koscait/survey
+git log --oneline -10                       # find the last good commit
+git checkout <sha>                          # detach onto the good revision
+docker compose -f docker-compose.dev.yml up -d --force-recreate app
+curl -sf http://localhost:3002/api/health/ready    # confirm green
+```
+
+If a bad migration is part of the rollback, you also need to revert the schema. **Never** run a destructive `prisma migrate reset` against prod; instead restore from the latest backup (see `docs/BACKUP.md` → "Restore drill"), then redeploy the good commit. Document every prod rollback in this file under a dated bullet so the next one is faster.
+
+## Load test (k6)
+
+```sh
+k6 run --vus 10 --duration 30s tests/loadtest/smoke.js
+BASE_URL=https://your-host k6 run tests/loadtest/smoke.js
+```
+
+Smoke profile asserts: `/api/health/live` p95 < 200ms, `/api/health/ready` p95 < 500ms, `/login` p95 < 1.5s, error rate < 1%. Failure exits non-zero. Run weekly and after any infra change.
+
 ## Reference
 
 - Health: `GET /api/health/live`, `GET /api/health/ready`
+- Metrics: `GET /api/metrics` (Prometheus exposition)
 - Audit log: `select * from "AuditLog" order by "createdAt" desc limit 50;`
 - Backup script: `scripts/backup.sh` (see `docs/BACKUP.md`)
 - Migration policy: `npx prisma migrate deploy` only — never `db push` against prod

@@ -49,7 +49,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ token: str
   const res = NextResponse.json({ ok: true });
   res.cookies.set(`survey_${token}`, '1', {
     httpOnly: true,
-    sameSite: 'lax',
+    // strict prevents this cookie from being attached to cross-site POSTs,
+    // which kills CSRF as an attack class on survey submission.
+    sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: 60 * 60 * 6, // 6h

@@ -36,7 +36,27 @@ function applyRequestHeaders(req: NextRequest, res: NextResponse) {
   res.headers.set('permissions-policy', 'camera=(), microphone=(), geolocation=()');
   if (process.env.NODE_ENV === 'production') {
     res.headers.set('strict-transport-security', 'max-age=63072000; includeSubDomains');
+    // CSP is production-only to avoid blocking Next.js dev eval / inline HMR.
+    // Inline scripts/styles are needed for next/script "beforeInteractive"
+    // (the theme bootstrap) and Next's runtime bootstrap.
+    res.headers.set(
+      'content-security-policy',
+      [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "img-src 'self' data: blob:",
+        "font-src 'self' https://fonts.gstatic.com data:",
+        "connect-src 'self'",
+        "frame-ancestors 'self'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ].join('; '),
+    );
   }
+  // Cross-origin protections that work in dev too.
+  res.headers.set('cross-origin-opener-policy', 'same-origin');
+  res.headers.set('cross-origin-resource-policy', 'same-origin');
   return res;
 }
 

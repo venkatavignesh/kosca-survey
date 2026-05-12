@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/api';
-import { audit, AUDIT_ACTIONS } from '@/lib/audit';
-import { parsePage, pagedResult } from '@/lib/pagination';
+import { parsePage, pagedResult, LEGACY_LIST_CAP } from '@/lib/pagination';
+import { createEmployee } from '@/lib/services/employees';
+import { ApiError } from '@/lib/errors';
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin();
@@ -34,10 +35,8 @@ export async function GET(req: NextRequest) {
   };
   const paged = sp.has('page') || sp.has('limit');
   if (!paged) {
-    // Legacy unpaginated mode — the admin UI still uses this. The pagination
-    // path is opt-in via ?page= / ?limit= so future callers can avoid the
-    // unbounded scan.
-    const employees = await prisma.employee.findMany(findArgs);
+    // Legacy unpaginated mode, capped server-side so it's not a DoS vector.
+    const employees = await prisma.employee.findMany({ ...findArgs, take: LEGACY_LIST_CAP });
     return NextResponse.json(employees);
   }
   const p = parsePage(sp);
@@ -65,25 +64,15 @@ export async function POST(req: NextRequest) {
   const parsed = Body.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: 'invalid input' }, { status: 400 });
   try {
-    const e = await prisma.employee.create({
-      data: {
-        ...parsed.data,
-        email: parsed.data.email.toLowerCase().trim(),
-        empCode: parsed.data.empCode.trim(),
-      },
-    });
-    await audit({
-      action: AUDIT_ACTIONS.EMPLOYEE_CREATE,
-      userId: auth.session.user.id,
+    const e = await createEmployee({
+      ...parsed.data,
+      actorId: auth.session.user.id,
       actorEmail: auth.session.user.email,
-      entityType: 'Employee',
-      entityId: e.id,
-      metadata: { empCode: e.empCode, name: e.name },
     });
     return NextResponse.json(e, { status: 201 });
-  } catch (e: any) {
-    if (e.code === 'P2002') {
-      return NextResponse.json({ error: 'empCode already exists' }, { status: 409 });
+  } catch (e) {
+    if (e instanceof ApiError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
     }
     throw e;
   }

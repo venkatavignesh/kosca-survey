@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/api';
-import { audit, AUDIT_ACTIONS } from '@/lib/audit';
-import { parsePage, pagedResult } from '@/lib/pagination';
+import { parsePage, pagedResult, LEGACY_LIST_CAP } from '@/lib/pagination';
+import { createCampaign } from '@/lib/services/campaigns';
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin();
@@ -17,8 +17,9 @@ export async function GET(req: NextRequest) {
     include: { _count: { select: { assignments: true, questions: true } } },
   };
   if (!paged) {
-    // Legacy clients get the full unpaginated list (current admin UI).
-    const items = await prisma.campaign.findMany(findArgs);
+    // Legacy unpaginated mode is bounded by LEGACY_LIST_CAP so a runaway
+    // client can never sweep the whole table.
+    const items = await prisma.campaign.findMany({ ...findArgs, take: LEGACY_LIST_CAP });
     return NextResponse.json(items);
   }
   const [items, total] = await Promise.all([
@@ -42,20 +43,10 @@ export async function POST(req: NextRequest) {
   const json = await req.json().catch(() => null);
   const parsed = Body.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: 'invalid input' }, { status: 400 });
-  const c = await prisma.campaign.create({
-    data: {
-      ...parsed.data,
-      deadline: parsed.data.deadline ? new Date(parsed.data.deadline) : null,
-      createdById: auth.session.user.id,
-    },
-  });
-  await audit({
-    action: AUDIT_ACTIONS.CAMPAIGN_CREATE,
-    userId: auth.session.user.id,
+  const c = await createCampaign({
+    ...parsed.data,
+    createdById: auth.session.user.id,
     actorEmail: auth.session.user.email,
-    entityType: 'Campaign',
-    entityId: c.id,
-    metadata: { title: c.title },
   });
   return NextResponse.json(c, { status: 201 });
 }

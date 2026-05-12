@@ -2,8 +2,11 @@
 // All admin GET routes should funnel through `parsePage` so the limits
 // (max=200, default=50) cannot be bypassed by a malicious client.
 
-const MAX_LIMIT = 200;
-const DEFAULT_LIMIT = 50;
+export const MAX_LIMIT = 200;
+export const DEFAULT_LIMIT = 50;
+// Hard ceiling applied to legacy "unpaginated" endpoints so a runaway client
+// or accidental loop can never request the whole table.
+export const LEGACY_LIST_CAP = 500;
 
 export type PagedQuery = {
   page: number;       // 1-based

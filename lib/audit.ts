@@ -1,5 +1,6 @@
 import { prisma } from './db';
 import { logger } from './logger';
+import { auditWritesTotal } from './metrics';
 import { headers } from 'next/headers';
 
 // Standard action codes. Audit consumers (admin UI, exports) should filter by
@@ -63,6 +64,7 @@ export async function audit(input: AuditInput): Promise<void> {
         ip,
       },
     });
+    auditWritesTotal.inc({ action: input.action });
   } catch (err) {
     logger.warn({ err, action: input.action }, 'audit log write failed');
   }
