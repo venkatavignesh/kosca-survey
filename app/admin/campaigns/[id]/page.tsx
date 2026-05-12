@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { RecipientsBuilder } from './ui';
 import { formatDate } from '@/lib/dates';
+import { DuplicateCampaignButton } from '@/components/DuplicateCampaignButton';
 
 export default async function CampaignPage(props: { params: Promise<{ id: string }> }) {
   const { id } = await props.params;
@@ -43,6 +44,7 @@ export default async function CampaignPage(props: { params: Promise<{ id: string
           <Link className="btn-secondary" href={`/admin/campaigns/${campaign.id}/edit`}>Edit settings</Link>
           <Link className="btn-secondary" href={`/admin/campaigns/${campaign.id}/questions`}>Manage questions</Link>
           <Link className="btn-secondary" href={`/admin/campaigns/${campaign.id}/report`}>Report</Link>
+          <DuplicateCampaignButton campaignId={campaign.id} className="btn-secondary" />
           <Link className="btn" href={`/admin/campaigns/${campaign.id}/responses`}>View responses</Link>
         </div>
       </div>

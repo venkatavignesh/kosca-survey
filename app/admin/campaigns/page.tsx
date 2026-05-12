@@ -4,6 +4,7 @@ import { SortLink, type SortDir } from '@/components/SortLink';
 import { UrlPaginationStats, UrlPaginationNav } from '@/components/UrlPagination';
 import { clampPage, clampPerPage } from '@/components/pagination-utils';
 import { formatDate } from '@/lib/dates';
+import { DuplicateCampaignButton } from '@/components/DuplicateCampaignButton';
 
 const ALLOWED_SORTS = new Set(['title', 'status', 'questions', 'submitted', 'progress', 'deadline', 'createdAt']);
 
@@ -101,6 +102,7 @@ export default async function CampaignsPage(props: { searchParams: Promise<Recor
                     <div className="flex gap-2 justify-center">
                       <Link href={`/admin/campaigns/${c.id}`} className="btn-secondary !py-1 !px-3 text-xs">Open</Link>
                       <Link href={`/admin/campaigns/${c.id}/edit`} className="btn-secondary !py-1 !px-3 text-xs">Edit</Link>
+                      <DuplicateCampaignButton campaignId={c.id} />
                     </div>
                   </td>
                 </tr>
