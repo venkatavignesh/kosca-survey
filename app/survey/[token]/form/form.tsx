@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type QType = 'RADIO' | 'CHECKBOX' | 'MCQ_SINGLE' | 'MCQ_MULTI' | 'TEXT' | 'LONG_TEXT';
@@ -30,14 +30,24 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
   const slice = questions.slice(startIdx, startIdx + PER_PAGE);
   const isLastPage = safePage >= totalPages;
 
+  // Any error banner is scoped to the page that produced it. Wipe it when
+  // the user moves to a different page so they never see "answer Q11" on a
+  // page where Q11 isn't even shown.
+  useEffect(() => {
+    setErr(null);
+  }, [safePage]);
+
   function setText(qid: string, v: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueText: v } }));
+    setErr(null);
   }
   function setComment(qid: string, v: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueText: v } }));
+    setErr(null);
   }
   function setSingle(qid: string, opt: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueOptions: [opt] } }));
+    setErr(null);
   }
   function toggleMulti(qid: string, opt: string) {
     setAnswers((a) => {
@@ -45,6 +55,7 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
       const next = cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt];
       return { ...a, [qid]: { ...a[qid], valueOptions: next } };
     });
+    setErr(null);
   }
 
   // Returns the 1-based index of the first unanswered required question in
