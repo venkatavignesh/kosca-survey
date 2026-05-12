@@ -49,17 +49,18 @@ function applyRequestHeaders(req: NextRequest, res: NextResponse) {
       'content-security-policy',
       [
         "default-src 'self'",
-        // The per-request nonce stays in the header as a forward-compat hook,
-        // but we deliberately do NOT use 'strict-dynamic' here. Next.js
-        // prerenders client routes (e.g. /login) as static HTML at build time,
-        // so the inline bootstrap/runtime scripts in the served HTML cannot
-        // carry a fresh nonce. Under 'strict-dynamic', browsers ignore
-        // 'unsafe-inline' the moment a nonce is present, which would block
-        // every script and leave the page stuck on its Suspense fallback
-        // ("Loading…"). Without 'strict-dynamic', CSP3 browsers honour
-        // 'unsafe-inline' as a fallback so the cached HTML hydrates, while
-        // nonce-aware code paths (when added) still match the nonce.
-        `script-src 'self' 'nonce-${nonce}' 'unsafe-inline' https:`,
+        // We still mint a per-request nonce (x-csp-nonce header) so server
+        // components / future inline-script injection can opt in, but we do
+        // NOT include 'nonce-…' here on script-src. Reason: Next.js prerenders
+        // client routes (e.g. /login) as static HTML at build time, so the
+        // inline bootstrap and runtime scripts in the served HTML cannot
+        // carry a fresh nonce. Per CSP Level 3, the presence of any
+        // 'nonce-…' / 'hash-…' source in script-src causes browsers to
+        // IGNORE 'unsafe-inline' — which would block every prerendered
+        // inline script and leave /login stuck on its Suspense fallback
+        // ("Loading…"). Until we wire request-time nonce injection through
+        // the Next.js renderer, fall back to 'unsafe-inline'.
+        `script-src 'self' 'unsafe-inline' https:`,
         // Styles are still inlined by Next.js without nonce support — keep
         // 'unsafe-inline' on style-src until that lands upstream.
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
