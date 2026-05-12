@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type QType = 'RADIO' | 'CHECKBOX' | 'MCQ_SINGLE' | 'MCQ_MULTI' | 'TEXT' | 'LONG_TEXT';
@@ -17,28 +17,19 @@ type Answers = Record<string, { valueText?: string; valueOptions?: string[] }>;
 
 const PER_PAGE = 10;
 
+// Single source of truth for "which questions are flagged as missing AND on
+// which page that flag set is valid". Render code refuses to glow anything
+// whose page doesn't match the current page, so a stale flag set can never
+// bleed onto a page the user just navigated to.
+type Validation = { page: number; missingIds: Set<string> } | null;
+
 export function SurveyForm({ token, questions }: { token: string; questions: Q[] }) {
   const router = useRouter();
   const [answers, setAnswers] = useState<Answers>({});
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  // Question ids currently flagged as "required and empty" — populated by
-  // validation, drained as the user fills them in. Drives the red glow.
-  const [missingIds, setMissingIds] = useState<Set<string>>(new Set());
-  // The page number missingIds belongs to. When the user navigates to a
-  // different page, the highlights from a prior validation are stale and get
-  // dropped automatically.
-  const missingIdsPage = useRef<number | null>(null);
-
-  function clearMissing(qid: string) {
-    setMissingIds((prev) => {
-      if (!prev.has(qid)) return prev;
-      const next = new Set(prev);
-      next.delete(qid);
-      return next;
-    });
-  }
+  const [validation, setValidation] = useState<Validation>(null);
 
   const totalPages = Math.max(1, Math.ceil(questions.length / PER_PAGE));
   const safePage = Math.min(Math.max(1, page), totalPages);
@@ -46,42 +37,46 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
   const slice = questions.slice(startIdx, startIdx + PER_PAGE);
   const isLastPage = safePage >= totalPages;
 
-  // Drop stale highlights whenever the user is on a different page than the
-  // one they were last flagged against (e.g. after a successful Next, or
-  // jumping back via Prev).
-  useEffect(() => {
-    if (missingIdsPage.current !== null && missingIdsPage.current !== safePage) {
-      setMissingIds(new Set());
-      missingIdsPage.current = null;
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safePage]);
+  function isFlagged(qid: string) {
+    // Only ever glow when the validation set was raised for the page being
+    // rendered. This is the invariant that makes cross-page bleed impossible.
+    return !!validation && validation.page === safePage && validation.missingIds.has(qid);
+  }
+
+  function clearOneFlag(qid: string) {
+    setValidation((prev) => {
+      if (!prev || !prev.missingIds.has(qid)) return prev;
+      const next = new Set(prev.missingIds);
+      next.delete(qid);
+      return next.size === 0 ? null : { page: prev.page, missingIds: next };
+    });
+  }
 
   function setText(qid: string, v: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueText: v } }));
-    if (v.trim()) clearMissing(qid);
+    if (v.trim()) clearOneFlag(qid);
   }
   function setComment(qid: string, v: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueText: v } }));
-    if (v.trim()) clearMissing(qid);
+    if (v.trim()) clearOneFlag(qid);
   }
   function setSingle(qid: string, opt: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueOptions: [opt] } }));
-    clearMissing(qid);
+    clearOneFlag(qid);
   }
   function toggleMulti(qid: string, opt: string) {
     setAnswers((a) => {
       const cur = a[qid]?.valueOptions || [];
       const next = cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt];
-      if (next.length > 0) clearMissing(qid);
+      if (next.length > 0) clearOneFlag(qid);
       return { ...a, [qid]: { ...a[qid], valueOptions: next } };
     });
   }
 
-  // Walks the given scope and returns *every* required question that hasn't
-  // been answered, plus the 1-based index of the first one (for the error
-  // message). textRequired (comment) is enforced independently of the primary
-  // required flag.
+  // Walks the given scope and returns every required question that hasn't been
+  // answered, plus the 1-based index of the first one (for the error message).
+  // textRequired (comment) is enforced independently of the primary required
+  // flag.
   function collectMissingRequired(scope: Q[]): { ids: string[]; firstIndex: number } {
     const ids: string[] = [];
     let firstIndex = 0;
@@ -115,22 +110,19 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
     setErr(null);
     const { ids, firstIndex } = collectMissingRequired(slice);
     if (firstIndex) {
-      setMissingIds(new Set(ids));
-      missingIdsPage.current = safePage;
+      setValidation({ page: safePage, missingIds: new Set(ids) });
       setErr(`Please answer required question ${startIdx + firstIndex} before continuing.`);
       scrollToQuestion(slice[firstIndex - 1].id);
       return;
     }
-    setMissingIds(new Set());
-    missingIdsPage.current = null;
+    setValidation(null);
     setPage(safePage + 1);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function goPrev() {
     setErr(null);
-    setMissingIds(new Set());
-    missingIdsPage.current = null;
+    setValidation(null);
     setPage(safePage - 1);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -138,7 +130,6 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    // Validate the entire form (across pages) on submit.
     const { ids, firstIndex } = collectMissingRequired(questions);
     if (firstIndex) {
       const targetPage = Math.ceil(firstIndex / PER_PAGE);
@@ -148,17 +139,13 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
           .filter((q) => ids.includes(q.id))
           .map((q) => q.id),
       );
-      // Only glow missing questions on the page the user is being jumped to.
-      // Validating elsewhere happens again when they navigate / re-submit.
-      setMissingIds(targetIds);
-      missingIdsPage.current = targetPage;
+      setValidation({ page: targetPage, missingIds: targetIds });
       setPage(targetPage);
       setErr(`Please answer required question ${firstIndex} before submitting.`);
       scrollToQuestion(questions[firstIndex - 1].id);
       return;
     }
-    setMissingIds(new Set());
-    missingIdsPage.current = null;
+    setValidation(null);
     setBusy(true);
     const payload = {
       answers: questions.map((q) => ({
@@ -186,7 +173,6 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
     }
   }
 
-  // Per-page progress (count of answered, of all on this page)
   const pageAnswered = useMemo(() => slice.filter((q) => {
     const a = answers[q.id];
     if (q.type === 'TEXT' || q.type === 'LONG_TEXT') return !!a?.valueText && !!a.valueText.trim();
@@ -206,7 +192,7 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
 
       {slice.map((q, idx) => {
         const i = startIdx + idx;
-        const flagged = missingIds.has(q.id);
+        const flagged = isFlagged(q.id);
         return (
           <div
             key={q.id}
@@ -297,7 +283,7 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
           {safePage} / {totalPages}
         </span>
         {isLastPage ? (
-          <button className="btn" disabled={busy}>
+          <button type="submit" className="btn" disabled={busy}>
             {busy ? 'Submitting…' : 'Submit responses'}
           </button>
         ) : (
