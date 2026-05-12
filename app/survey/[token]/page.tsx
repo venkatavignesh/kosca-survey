@@ -40,9 +40,6 @@ export default async function SurveyEntry(props: { params: Promise<{ token: stri
           className="rounded-lg p-4 text-sm"
           style={{ background: 'var(--surface-tertiary)', color: 'var(--text-secondary)' }}
         >
-          Hi <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{a.employee.name}</span>{' '}
-          <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>· {a.employee.empCode}</span>
-          <br />
           To confirm it's you, we'll email a one-time verification code to{' '}
           <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{masked}</span>.
         </div>
