@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 type QType = 'RADIO' | 'CHECKBOX' | 'MCQ_SINGLE' | 'MCQ_MULTI' | 'TEXT' | 'LONG_TEXT';
@@ -26,6 +26,10 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
   // Question ids currently flagged as "required and empty" — populated by
   // validation, drained as the user fills them in. Drives the red glow.
   const [missingIds, setMissingIds] = useState<Set<string>>(new Set());
+  // The page number missingIds belongs to. When the user navigates to a
+  // different page, the highlights from a prior validation are stale and get
+  // dropped automatically.
+  const missingIdsPage = useRef<number | null>(null);
 
   function clearMissing(qid: string) {
     setMissingIds((prev) => {
@@ -41,6 +45,17 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
   const startIdx = (safePage - 1) * PER_PAGE;
   const slice = questions.slice(startIdx, startIdx + PER_PAGE);
   const isLastPage = safePage >= totalPages;
+
+  // Drop stale highlights whenever the user is on a different page than the
+  // one they were last flagged against (e.g. after a successful Next, or
+  // jumping back via Prev).
+  useEffect(() => {
+    if (missingIdsPage.current !== null && missingIdsPage.current !== safePage) {
+      setMissingIds(new Set());
+      missingIdsPage.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safePage]);
 
   function setText(qid: string, v: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueText: v } }));
@@ -101,18 +116,21 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
     const { ids, firstIndex } = collectMissingRequired(slice);
     if (firstIndex) {
       setMissingIds(new Set(ids));
+      missingIdsPage.current = safePage;
       setErr(`Please answer required question ${startIdx + firstIndex} before continuing.`);
       scrollToQuestion(slice[firstIndex - 1].id);
       return;
     }
     setMissingIds(new Set());
+    missingIdsPage.current = null;
     setPage(safePage + 1);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function goPrev() {
     setErr(null);
-    setMissingIds(new Set());  // stale highlights from any earlier validation don't carry back
+    setMissingIds(new Set());
+    missingIdsPage.current = null;
     setPage(safePage - 1);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -133,12 +151,14 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
       // Only glow missing questions on the page the user is being jumped to.
       // Validating elsewhere happens again when they navigate / re-submit.
       setMissingIds(targetIds);
+      missingIdsPage.current = targetPage;
       setPage(targetPage);
       setErr(`Please answer required question ${firstIndex} before submitting.`);
       scrollToQuestion(questions[firstIndex - 1].id);
       return;
     }
     setMissingIds(new Set());
+    missingIdsPage.current = null;
     setBusy(true);
     const payload = {
       answers: questions.map((q) => ({
