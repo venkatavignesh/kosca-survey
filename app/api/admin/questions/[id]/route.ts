@@ -11,6 +11,7 @@ const Body = z.object({
   required: z.boolean().optional(),
   allowText: z.boolean().optional(),
   textRequired: z.boolean().optional(),
+  textLabel: z.string().max(120).nullable().optional(),
 });
 
 function needsOptions(t: QuestionType) {
@@ -36,10 +37,18 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       data.options = null;
       data.allowText = false;
       data.textRequired = false;
+      data.textLabel = null;
     }
   }
   // Keep dependent flag consistent.
-  if (data.allowText === false) data.textRequired = false;
+  if (data.allowText === false) {
+    data.textRequired = false;
+    data.textLabel = null;
+  }
+  if (typeof data.textLabel === 'string') {
+    const t = data.textLabel.trim();
+    data.textLabel = t || null;
+  }
   const q = await prisma.question.update({ where: { id }, data });
   return NextResponse.json(q);
 }

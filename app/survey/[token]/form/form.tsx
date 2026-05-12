@@ -11,6 +11,7 @@ type Q = {
   required: boolean;
   allowText?: boolean;       // choice questions only — show optional comment box
   textRequired?: boolean;    // when allowText, force comment to be filled
+  textLabel?: string | null; // custom label for the comment box; null → "Additional comment"
 };
 type Answers = Record<string, { valueText?: string; valueOptions?: string[] }>;
 
@@ -234,7 +235,8 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
             {q.allowText && q.type !== 'TEXT' && q.type !== 'LONG_TEXT' && (
               <div className="pt-2">
                 <label htmlFor={`comment-${q.id}`} className="label">
-                  Additional comment {q.textRequired
+                  {(q.textLabel && q.textLabel.trim()) || 'Additional comment'}{' '}
+                  {q.textRequired
                     ? <span className="text-[color:var(--error-text)]">*</span>
                     : <span style={{ color: 'var(--text-muted)' }}>(optional)</span>}
                 </label>

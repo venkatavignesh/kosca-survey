@@ -18,6 +18,7 @@ const Body = z.object({
   required: z.boolean().optional(),
   allowText: z.boolean().optional(),
   textRequired: z.boolean().optional(),
+  textLabel: z.string().max(120).nullable().optional(),
 });
 
 function needsOptions(t: QuestionType) {
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   const parsed = Body.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: 'invalid input' }, { status: 400 });
 
-  const { text, type, options, required, allowText, textRequired } = parsed.data;
+  const { text, type, options, required, allowText, textRequired, textLabel } = parsed.data;
   if (needsOptions(type)) {
     if (!options || options.length < 2) return NextResponse.json({ error: 'choice questions need at least 2 options' }, { status: 400 });
   }
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
       required: !!required,
       allowText: allowComment,
       textRequired: commentRequired,
+      textLabel: allowComment && textLabel?.trim() ? textLabel.trim() : null,
     },
   });
   return NextResponse.json(q, { status: 201 });

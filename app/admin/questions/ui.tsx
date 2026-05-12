@@ -5,7 +5,7 @@ import { PaginationStats, PaginationNav, usePaginated, PerPage } from '@/compone
 import { Modal } from '@/components/Modal';
 
 type QType = 'RADIO' | 'CHECKBOX' | 'MCQ_SINGLE' | 'MCQ_MULTI' | 'TEXT' | 'LONG_TEXT';
-type Q = { id: string; text: string; type: QType; options: string[] | null; required: boolean; allowText: boolean; textRequired: boolean; createdAt: string };
+type Q = { id: string; text: string; type: QType; options: string[] | null; required: boolean; allowText: boolean; textRequired: boolean; textLabel: string | null; createdAt: string };
 
 const TYPES: { value: QType; label: string; needsOptions: boolean }[] = [
   { value: 'RADIO', label: 'Radio (single choice)', needsOptions: true },
@@ -99,6 +99,7 @@ function Editor({ mode, question, onClose, onDone }: {
   const [required, setRequired] = useState<boolean>(question?.required || false);
   const [allowText, setAllowText] = useState<boolean>(question?.allowText || false);
   const [textRequired, setTextRequired] = useState<boolean>(question?.textRequired || false);
+  const [textLabel, setTextLabel] = useState<string>(question?.textLabel || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const needsOpts = TYPES.find((t) => t.value === type)?.needsOptions;
@@ -120,6 +121,7 @@ function Editor({ mode, question, onClose, onDone }: {
         required,
         allowText: canAllowText && allowText,
         textRequired: canAllowText && allowText && textRequired,
+        textLabel: canAllowText && allowText ? (textLabel.trim() || null) : null,
       }),
     });
     setBusy(false);
@@ -166,10 +168,28 @@ function Editor({ mode, question, onClose, onDone }: {
                 Allow additional comment (short text)
               </label>
               {allowText && (
-                <label className="flex items-center gap-2 text-sm pl-6" style={{ color: 'var(--text-secondary)' }}>
-                  <input type="checkbox" checked={textRequired} onChange={(e) => setTextRequired(e.target.checked)} />
-                  Comment is required
-                </label>
+                <>
+                  <label className="flex items-center gap-2 text-sm pl-6" style={{ color: 'var(--text-secondary)' }}>
+                    <input type="checkbox" checked={textRequired} onChange={(e) => setTextRequired(e.target.checked)} />
+                    Comment is required
+                  </label>
+                  <div className="pl-6 pt-1">
+                    <label htmlFor="question-text-label" className="label">
+                      Comment box label{' '}
+                      <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
+                        (defaults to "Additional comment")
+                      </span>
+                    </label>
+                    <input
+                      id="question-text-label"
+                      className="input"
+                      placeholder="e.g. Mention Manager's Name"
+                      maxLength={120}
+                      value={textLabel}
+                      onChange={(e) => setTextLabel(e.target.value)}
+                    />
+                  </div>
+                </>
               )}
             </div>
           )}

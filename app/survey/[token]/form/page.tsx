@@ -50,6 +50,7 @@ export default async function SurveyFormPage(props: { params: Promise<{ token: s
           required: cq.question.required,
           allowText: cq.question.allowText,
           textRequired: cq.question.textRequired,
+          textLabel: cq.question.textLabel,
         }))}
       />
     </div>

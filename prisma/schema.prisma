@@ -104,6 +104,7 @@ model Question {
   required     Boolean      @default(false)
   allowText    Boolean      @default(false)
   textRequired Boolean      @default(false)
+  textLabel    String?      // custom label for the comment box; null → "Additional comment"
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
