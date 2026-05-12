@@ -2,7 +2,7 @@
 FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS deps
 WORKDIR /app
 RUN apk add --no-cache libc6-compat openssl=3.5.6-r0
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* .npmrc* ./
 RUN --mount=type=cache,target=/root/.npm \
     if [ -f package-lock.json ]; then npm ci --prefer-offline; else npm install --prefer-offline; fi
 
