@@ -8,6 +8,7 @@ import { QuestionPicker } from '@/components/QuestionPicker';
 import { UrlPaginationStats, UrlPaginationNav } from '@/components/UrlPagination';
 import { clampPage, clampPerPage } from '@/components/pagination-utils';
 import { formatDate, formatDateTime } from '@/lib/dates';
+import { BackToTop } from '@/components/BackToTop';
 
 // Shared body — admin and HR mirrors render the same UI.
 export async function ReportView({
@@ -71,7 +72,7 @@ export async function ReportView({
   const isText = report.question?.type === 'TEXT' || report.question?.type === 'LONG_TEXT';
 
   return (
-    <div className="space-y-4">
+    <div id="top" className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-[10px] uppercase font-bold tracking-wider" style={{ color: 'var(--accent-primary)' }}>
@@ -138,11 +139,11 @@ export async function ReportView({
       />
 
       {!report.question ? (
-        <div className="card text-center" style={{ color: 'var(--text-muted)' }}>
+        <div id="recipients" className="card text-center" style={{ color: 'var(--text-muted)' }}>
           Pick a question above to see the answer distribution and the employees behind each option.
         </div>
       ) : (
-        <div className="card overflow-x-auto">
+        <div id="recipients" className="card overflow-x-auto" style={{ scrollMarginTop: '1rem' }}>
           <div className="pb-3">
             <UrlPaginationStats total={report.matches.length} />
           </div>
@@ -220,6 +221,7 @@ export async function ReportView({
           </div>
         </div>
       )}
+      <BackToTop />
     </div>
   );
 }
@@ -520,7 +522,7 @@ function GroupDistribution({
   openGroup: string;
 }) {
   const arr = (k: string): string[] => Array.isArray(sp[k]) ? (sp[k] as string[]) : sp[k] ? [sp[k] as string] : [];
-  function buildUrl(updates: Record<string, string | null>) {
+  function buildUrl(updates: Record<string, string | string[] | null>) {
     const params = new URLSearchParams();
     const base: Record<string, string[] | string> = {
       questionId: typeof sp.questionId === 'string' ? sp.questionId : '',
@@ -651,26 +653,35 @@ function GroupDistribution({
                     Hide ×
                   </Link>
                 </div>
-                <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+                <div className="flex flex-wrap justify-center gap-3">
                   {g.questions.map((q) => {
                     const isSelected = selectedQuestionId === q.questionId;
+                    const allHref = buildUrl({ questionId: q.questionId, openGroup: gid, option: [] }) + '#recipients';
                     return (
-                      <Link
+                      <div
                         key={q.questionId}
-                        prefetch
-                        scroll={false}
-                        href={buildUrl({ questionId: q.questionId, openGroup: gid })}
-                        title="Drill into this question"
-                        className="block rounded-md p-3 space-y-2 transition-colors hover:shadow-sm"
+                        className="block rounded-md p-3 space-y-2 transition-colors"
                         style={{
                           background: 'var(--surface-primary)',
                           border: `1px solid ${isSelected ? 'var(--accent-primary)' : 'var(--border-subtle)'}`,
                           boxShadow: isSelected ? '0 0 0 1px var(--accent-primary)' : undefined,
                           color: 'var(--text-primary)',
-                          textDecoration: 'none',
+                          flex: g.questions.length <= 2
+                            ? '1 1 min(100%, 32rem)'
+                            : '1 1 calc((100% - 1.5rem) / 3)',
+                          maxWidth: g.questions.length <= 2
+                            ? 'min(100%, 32rem)'
+                            : 'calc((100% - 1.5rem) / 3)',
+                          minWidth: g.questions.length >= 3 ? '16rem' : undefined,
                         }}
                       >
-                        <div className="text-[12.5px] leading-snug font-medium">
+                        <Link
+                          prefetch
+                          href={allHref}
+                          title="See everyone who answered this question"
+                          className="block text-[12.5px] leading-snug font-medium hover:underline"
+                          style={{ color: 'inherit', textDecoration: 'none' }}
+                        >
                           <span
                             className="inline-flex items-center justify-center mr-2 rounded-full text-[10px] font-semibold align-middle"
                             style={{
@@ -686,16 +697,28 @@ function GroupDistribution({
                             Q{q.position}
                           </span>
                           {q.text}
-                        </div>
+                        </Link>
                         {q.totalAnswered === 0 ? (
                           <div className="text-[11px] italic" style={{ color: 'var(--text-muted)' }}>No answers yet.</div>
                         ) : (
-                          <GroupedBars buckets={q.buckets} maxCount={Math.max(1, ...q.buckets.map((b) => b.count))} total={q.totalAnswered} compact />
+                          <GroupedBars
+                            buckets={q.buckets}
+                            maxCount={Math.max(1, ...q.buckets.map((b) => b.count))}
+                            total={q.totalAnswered}
+                            compact
+                            options={q.options}
+                            buildOptionHref={(opt) => buildUrl({ questionId: q.questionId, openGroup: gid, option: [opt] }) + '#recipients'}
+                          />
                         )}
-                        <div className="text-center text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                        <Link
+                          prefetch
+                          href={allHref}
+                          className="block text-center text-[10px] font-medium hover:underline"
+                          style={{ color: 'var(--text-muted)', textDecoration: 'none' }}
+                        >
                           {q.totalAnswered} answered
-                        </div>
-                      </Link>
+                        </Link>
+                      </div>
                     );
                   })}
                 </div>
@@ -710,8 +733,15 @@ function GroupDistribution({
 }
 
 function GroupedBars({
-  buckets, maxCount, total, compact = false,
-}: { buckets: { letter: string; count: number }[]; maxCount: number; total: number; compact?: boolean }) {
+  buckets, maxCount, total, compact = false, options, buildOptionHref,
+}: {
+  buckets: { letter: string; count: number }[];
+  maxCount: number;
+  total: number;
+  compact?: boolean;
+  options?: string[];
+  buildOptionHref?: (option: string) => string;
+}) {
   const labels = bucketLabels(buckets.length);
   const labelCol = compact ? '5.5rem' : '6.5rem';
   const barH = compact ? 'h-2' : 'h-3';
@@ -721,13 +751,10 @@ function GroupedBars({
       {buckets.map((b, i) => {
         const w = maxCount > 0 ? (b.count / maxCount) * 100 : 0;
         const pct = total > 0 ? Math.round((b.count / total) * 100) : 0;
-        return (
-          <div
-            key={b.letter}
-            className="grid items-center gap-2"
-            style={{ gridTemplateColumns: `${labelCol} 1fr 3rem` }}
-            title={`${labels[i]}: ${b.count} (${pct}%)`}
-          >
+        const optionText = options?.[i];
+        const drillHref = optionText && buildOptionHref ? buildOptionHref(optionText) : null;
+        const content = (
+          <>
             <span
               className={`${fontSize} font-medium leading-tight truncate`}
               style={{ color: 'var(--text-secondary)' }}
@@ -751,6 +778,30 @@ function GroupedBars({
               <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{b.count}</span>
               <span className="ml-1">{pct}%</span>
             </span>
+          </>
+        );
+        if (drillHref && b.count > 0) {
+          return (
+            <Link
+              key={b.letter}
+              prefetch
+              href={drillHref}
+              className="grid items-center gap-2 rounded-md px-1 py-0.5 -mx-1 hover:bg-[var(--accent-hover,var(--page-bg))] transition-colors cursor-pointer"
+              style={{ gridTemplateColumns: `${labelCol} 1fr 3rem`, color: 'inherit', textDecoration: 'none' }}
+              title={`${labels[i]} — ${optionText}: ${b.count} (${pct}%). Click to see respondents.`}
+            >
+              {content}
+            </Link>
+          );
+        }
+        return (
+          <div
+            key={b.letter}
+            className="grid items-center gap-2"
+            style={{ gridTemplateColumns: `${labelCol} 1fr 3rem` }}
+            title={`${labels[i]}${optionText ? ` — ${optionText}` : ''}: ${b.count} (${pct}%)`}
+          >
+            {content}
           </div>
         );
       })}
