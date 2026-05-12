@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={inter.className} suppressHydrationWarning>
-      <body>
+      <body suppressHydrationWarning>
         {/* Synchronous external script — runs before first paint so dark-mode
             users never see a flash of light. Source: /public/theme-bootstrap.js.
             next/script with strategy="beforeInteractive" injects this into the

@@ -26,6 +26,9 @@ export async function sendCampaign(input: SendInput): Promise<SendResult> {
   if (!campaign) throw new ApiError(404, 'NOT_FOUND', 'campaign not found');
 
   const isReminder = !!input.resend;
+  // Manual reminders have NO time gating — admins can re-mail any invited
+  // non-submitter whenever they want. The 23/24h debounce lives only on the
+  // automatic daily-cron path (see /api/cron/daily-reminders).
   const where: any = {
     campaignId: input.campaignId,
     submittedAt: null,
@@ -33,8 +36,12 @@ export async function sendCampaign(input: SendInput): Promise<SendResult> {
   if (input.assignmentIds && input.assignmentIds.length > 0) {
     where.id = { in: input.assignmentIds };
   }
-  if (isReminder) where.emailSentAt = { not: null };
-  else where.emailSentAt = null;
+  if (isReminder) {
+    // Must have been invited at least once.
+    where.emailSentAt = { not: null };
+  } else {
+    where.emailSentAt = null;
+  }
 
   const assignments = await prisma.campaignAssignment.findMany({
     where,

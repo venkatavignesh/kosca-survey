@@ -48,12 +48,14 @@ export async function POST(req: NextRequest) {
   const failed: { assignmentId: string; error: string }[] = [];
 
   for (const campaign of campaigns) {
-    // Eligible recipients: invited but not submitted, debounced 23h since last AUTO reminder.
+    // Eligible recipients: invited at least 24h ago, not submitted, debounced
+    // 23h since last AUTO reminder. Same-day invitees are deliberately excluded
+    // — a reminder must NEVER cluster with the initial invite.
     const recipients = await prisma.campaignAssignment.findMany({
       where: {
         campaignId: campaign.id,
         submittedAt: null,
-        emailSentAt: { not: null },
+        emailSentAt: { not: null, lt: cutoff },
         OR: [
           { lastAutoReminderAt: null },
           { lastAutoReminderAt: { lt: cutoff } },

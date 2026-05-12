@@ -86,6 +86,7 @@ function LoginForm() {
             onChange={(e) => setEmail(e.target.value)}
             required
             autoComplete="email"
+            suppressHydrationWarning
           />
         </div>
         <div>
@@ -97,6 +98,7 @@ function LoginForm() {
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
+            suppressHydrationWarning
           />
         </div>
         {err && <div className="form-error">{err}</div>}

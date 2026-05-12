@@ -75,6 +75,20 @@ If genuine abuse: nothing to do — the limiter is working. If a real user, bump
 
 ---
 
+## Dev server hangs / routes never respond (Turbopack stuck)
+
+Symptom: a route (e.g. `/admin`) opens a connection but the server never logs the request and never responds. `GET /api/health/live` still returns 200 — only specific routes hang.
+
+```sh
+docker compose -f docker-compose.dev.yml down
+docker volume rm survey_survey_dev_next
+docker compose -f docker-compose.dev.yml up -d
+```
+
+This nukes Turbopack's incremental cache. The first hit on each route after the restart will recompile (3-10 s) and then stay fast.
+
+---
+
 ## Rollback to previous deploy
 
 ```sh

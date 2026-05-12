@@ -22,6 +22,18 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  // Question ids currently flagged as "required and empty" — populated by
+  // validation, drained as the user fills them in. Drives the red glow.
+  const [missingIds, setMissingIds] = useState<Set<string>>(new Set());
+
+  function clearMissing(qid: string) {
+    setMissingIds((prev) => {
+      if (!prev.has(qid)) return prev;
+      const next = new Set(prev);
+      next.delete(qid);
+      return next;
+    });
+  }
 
   const totalPages = Math.max(1, Math.ceil(questions.length / PER_PAGE));
   const safePage = Math.min(Math.max(1, page), totalPages);
@@ -30,56 +42,69 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
   const isLastPage = safePage >= totalPages;
 
   function setText(qid: string, v: string) {
-    // For pure text questions, valueText IS the answer.
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueText: v } }));
+    if (v.trim()) clearMissing(qid);
   }
-  // For choice-with-comment questions, the comment lives alongside the picked options.
   function setComment(qid: string, v: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueText: v } }));
+    if (v.trim()) clearMissing(qid);
   }
   function setSingle(qid: string, opt: string) {
     setAnswers((a) => ({ ...a, [qid]: { ...a[qid], valueOptions: [opt] } }));
+    clearMissing(qid);
   }
   function toggleMulti(qid: string, opt: string) {
     setAnswers((a) => {
       const cur = a[qid]?.valueOptions || [];
       const next = cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt];
+      if (next.length > 0) clearMissing(qid);
       return { ...a, [qid]: { ...a[qid], valueOptions: next } };
     });
   }
 
-  // Returns the 1-based index of the first unanswered required question, or 0 if all good.
-  // Also enforces textRequired: if a choice question has an allowText comment box
-  // marked required, the comment must be non-empty too.
-  function firstMissingRequired(scope: Q[]): number {
-    for (let i = 0; i < scope.length; i++) {
-      const q = scope[i];
+  // Walks the given scope and returns *every* required question that hasn't
+  // been answered, plus the 1-based index of the first one (for the error
+  // message). textRequired (comment) is enforced independently of the primary
+  // required flag.
+  function collectMissingRequired(scope: Q[]): { ids: string[]; firstIndex: number } {
+    const ids: string[] = [];
+    let firstIndex = 0;
+    scope.forEach((q, i) => {
       const a = answers[q.id];
       const isText = q.type === 'TEXT' || q.type === 'LONG_TEXT';
+      let missing = false;
       if (q.required) {
-        if (isText) {
-          if (!a?.valueText || !a.valueText.trim()) return i + 1;
-        } else {
-          if (!a?.valueOptions || a.valueOptions.length === 0) return i + 1;
-        }
+        if (isText) missing = !a?.valueText || !a.valueText.trim();
+        else missing = !a?.valueOptions || a.valueOptions.length === 0;
       }
-      // Comment-required check (independent of `q.required` so even an optional
-      // primary answer with a required comment is enforced — it's the comment
-      // that's required in that case).
-      if (q.allowText && q.textRequired) {
-        if (!a?.valueText || !a.valueText.trim()) return i + 1;
+      if (!missing && q.allowText && q.textRequired) {
+        missing = !a?.valueText || !a.valueText.trim();
       }
-    }
-    return 0;
+      if (missing) {
+        ids.push(q.id);
+        if (!firstIndex) firstIndex = i + 1;
+      }
+    });
+    return { ids, firstIndex };
+  }
+
+  function scrollToQuestion(qid: string) {
+    if (typeof window === 'undefined') return;
+    requestAnimationFrame(() => {
+      document.getElementById(`q-${qid}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   }
 
   function goNext() {
     setErr(null);
-    const missing = firstMissingRequired(slice);
-    if (missing) {
-      setErr(`Please answer required question ${startIdx + missing} before continuing.`);
+    const { ids, firstIndex } = collectMissingRequired(slice);
+    if (firstIndex) {
+      setMissingIds(new Set(ids));
+      setErr(`Please answer required question ${startIdx + firstIndex} before continuing.`);
+      scrollToQuestion(slice[firstIndex - 1].id);
       return;
     }
+    setMissingIds(new Set());
     setPage(safePage + 1);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -94,14 +119,16 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
     e.preventDefault();
     setErr(null);
     // Validate the entire form (across pages) on submit.
-    const missing = firstMissingRequired(questions);
-    if (missing) {
-      const targetPage = Math.ceil(missing / PER_PAGE);
+    const { ids, firstIndex } = collectMissingRequired(questions);
+    if (firstIndex) {
+      setMissingIds(new Set(ids));
+      const targetPage = Math.ceil(firstIndex / PER_PAGE);
       setPage(targetPage);
-      setErr(`Please answer required question ${missing} before submitting.`);
-      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+      setErr(`Please answer required question ${firstIndex} before submitting.`);
+      scrollToQuestion(questions[firstIndex - 1].id);
       return;
     }
+    setMissingIds(new Set());
     setBusy(true);
     const payload = {
       answers: questions.map((q) => ({
@@ -149,10 +176,30 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
 
       {slice.map((q, idx) => {
         const i = startIdx + idx;
+        const flagged = missingIds.has(q.id);
         return (
-          <div key={q.id} className="card space-y-3">
+          <div
+            key={q.id}
+            id={`q-${q.id}`}
+            className={`card space-y-3 transition-shadow${flagged ? ' missing-required' : ''}`}
+            style={flagged
+              ? {
+                  borderColor: 'var(--error-text)',
+                  boxShadow: '0 0 0 2px rgba(220, 38, 38, 0.35), 0 0 18px 2px rgba(220, 38, 38, 0.45)',
+                }
+              : undefined}
+            aria-invalid={flagged || undefined}
+          >
             <div className="font-medium">
               {i + 1}. {q.text} {q.required && <span className="text-[color:var(--error-text)]">*</span>}
+              {flagged && (
+                <span
+                  className="ml-2 text-[11px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 align-middle"
+                  style={{ background: 'var(--error-text)', color: '#fff' }}
+                >
+                  required
+                </span>
+              )}
             </div>
             {q.type === 'TEXT' && (
               <input className="input" required={q.required} value={answers[q.id]?.valueText || ''} onChange={(e) => setText(q.id, e.target.value)} />
