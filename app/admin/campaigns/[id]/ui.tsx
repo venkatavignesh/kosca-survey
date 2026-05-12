@@ -46,9 +46,22 @@ export function RecipientsBuilder({ campaign, employees, locations, officeTypes,
   const [err, setErr] = useState<string | null>(null);
 
   const savedEmpIds = useMemo(() => new Set(campaign.assignments.map((a) => a.employeeId)), [campaign.assignments]);
-  const recipientsDirty = selectedEmpIds.size !== savedEmpIds.size
-    || Array.from(selectedEmpIds).some((id) => !savedEmpIds.has(id))
-    || Array.from(savedEmpIds).some((id) => !selectedEmpIds.has(id));
+  // Submitted assignments can NEVER be removed server-side (see
+  // syncCampaignAssignments), so we treat them as always-selected when
+  // computing dirty. Without this guard, de-selecting a submitted recipient
+  // creates an unresolvable diff and the auto-save loops forever.
+  const lockedEmpIds = useMemo(
+    () => new Set(campaign.assignments.filter((a) => a.submittedAt).map((a) => a.employeeId)),
+    [campaign.assignments],
+  );
+  const effectiveSelected = useMemo(() => {
+    const s = new Set(selectedEmpIds);
+    for (const id of lockedEmpIds) s.add(id);
+    return s;
+  }, [selectedEmpIds, lockedEmpIds]);
+  const recipientsDirty = effectiveSelected.size !== savedEmpIds.size
+    || Array.from(effectiveSelected).some((id) => !savedEmpIds.has(id))
+    || Array.from(savedEmpIds).some((id) => !effectiveSelected.has(id));
 
   const savedButUnsent = campaign.assignments.filter((a) => selectedEmpIds.has(a.employeeId) && !a.emailSentAt && !a.submittedAt).length;
   // Reminder-eligible: selected, has been invited (emailSentAt set), and not yet submitted.
@@ -140,11 +153,17 @@ export function RecipientsBuilder({ campaign, employees, locations, officeTypes,
   function removeAllFiltered() {
     setSelectedEmpIds((prev) => {
       const next = new Set(prev);
-      filteredEmployees.forEach((e) => next.delete(e.id));
+      filteredEmployees.forEach((e) => {
+        if (lockedEmpIds.has(e.id)) return; // submitted — can't un-assign
+        next.delete(e.id);
+      });
       return next;
     });
   }
   function toggleEmp(id: string) {
+    // Submitted recipients are locked — un-checking is a no-op so the auto-save
+    // can converge.
+    if (lockedEmpIds.has(id)) return;
     setSelectedEmpIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -166,7 +185,7 @@ export function RecipientsBuilder({ campaign, employees, locations, officeTypes,
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            employeeIds: Array.from(selectedEmpIds),
+            employeeIds: Array.from(effectiveSelected),
             questions: campaign.questions.map((cq) => ({
               questionId: cq.questionId,
               order: cq.order,
@@ -189,7 +208,11 @@ export function RecipientsBuilder({ campaign, employees, locations, officeTypes,
       }
     }, 700);
     return () => clearTimeout(t);
-  }, [selectedEmpIds, recipientsDirty, campaign.id, campaign.questions, router]);
+    // Intentional: do not include campaign.questions in deps. Every server
+    // refresh creates a fresh array reference and would re-fire the effect
+    // even though the content is unchanged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEmpIds, recipientsDirty, campaign.id, router]);
 
   async function send(resend = false, onlyUnsent = true) {
     if (saveStatus === 'saving') {
@@ -279,16 +302,19 @@ export function RecipientsBuilder({ campaign, employees, locations, officeTypes,
           </thead>
           <tbody className="divide-y divide-[var(--border-subtle)]">
             {slice.map((e) => {
-              const checked = selectedEmpIds.has(e.id);
               const a = assignmentByEmp.get(e.id);
+              const locked = lockedEmpIds.has(e.id);
+              const checked = selectedEmpIds.has(e.id) || locked;
               return (
                 <tr key={e.id} className={a?.submittedAt ? 'bg-[var(--status-success-bg)]' : ''}>
                   <td className="!w-10">
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={locked}
                       onChange={() => toggleEmp(e.id)}
                       aria-label={`Select ${e.name}`}
+                      title={locked ? 'Submitted recipients cannot be removed' : undefined}
                     />
                   </td>
                   <td className="font-mono text-xs">{e.empCode}</td>
