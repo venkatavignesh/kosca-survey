@@ -112,6 +112,7 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
 
   function goPrev() {
     setErr(null);
+    setMissingIds(new Set());  // stale highlights from any earlier validation don't carry back
     setPage(safePage - 1);
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -122,8 +123,16 @@ export function SurveyForm({ token, questions }: { token: string; questions: Q[]
     // Validate the entire form (across pages) on submit.
     const { ids, firstIndex } = collectMissingRequired(questions);
     if (firstIndex) {
-      setMissingIds(new Set(ids));
       const targetPage = Math.ceil(firstIndex / PER_PAGE);
+      const targetStart = (targetPage - 1) * PER_PAGE;
+      const targetIds = new Set(
+        questions.slice(targetStart, targetStart + PER_PAGE)
+          .filter((q) => ids.includes(q.id))
+          .map((q) => q.id),
+      );
+      // Only glow missing questions on the page the user is being jumped to.
+      // Validating elsewhere happens again when they navigate / re-submit.
+      setMissingIds(targetIds);
       setPage(targetPage);
       setErr(`Please answer required question ${firstIndex} before submitting.`);
       scrollToQuestion(questions[firstIndex - 1].id);
