@@ -320,10 +320,24 @@ body {
 /* Required-but-empty question highlight — outside @layer so it wins over .card.
    Applied only on Next/Submit when the user leaves a required question blank,
    and cleared the moment they start answering it. */
+@keyframes card-missing-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15), 0 0 6px rgba(220, 38, 38, 0.20);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.35), 0 0 18px rgba(220, 38, 38, 0.55);
+  }
+}
 .card.card-missing {
   border-color: #dc2626 !important;
   border-width: 2px !important;
-  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.25), 0 0 12px rgba(220, 38, 38, 0.35) !important;
-  transition: box-shadow 180ms ease, border-color 180ms ease;
+  animation: card-missing-pulse 1.6s ease-in-out infinite;
+  transition: border-color 180ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card.card-missing {
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.25), 0 0 12px rgba(220, 38, 38, 0.35) !important;
+  }
 }
 

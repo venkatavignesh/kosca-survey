@@ -593,17 +593,17 @@ function GroupDistribution({
                 boxShadow: isOpen ? '0 0 0 1px var(--accent-primary)' : undefined,
               }}
             >
-              <div className="text-center mb-2 font-semibold text-sm truncate" style={{ color: accent }}>
+              <div className="text-center mb-2 font-semibold text-base truncate" style={{ color: accent }}>
                 {g.name}
               </div>
               {total === 0 ? (
-                <div className="text-xs italic flex-1 flex items-center justify-center py-6" style={{ color: 'var(--text-muted)' }}>
+                <div className="text-sm italic flex-1 flex items-center justify-center py-6" style={{ color: 'var(--text-muted)' }}>
                   No answers yet.
                 </div>
               ) : (
                 <GroupedBars buckets={g.buckets} maxCount={maxCount} total={total} />
               )}
-              <div className="text-center mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              <div className="text-center mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                 {g.questionCount} question{g.questionCount === 1 ? '' : 's'} · {total} answer{total === 1 ? '' : 's'}
               </div>
               {g.questions.length > 0 && (
@@ -743,9 +743,11 @@ function GroupedBars({
   buildOptionHref?: (option: string) => string;
 }) {
   const labels = bucketLabels(buckets.length);
-  const labelCol = compact ? '5.5rem' : '6.5rem';
-  const barH = compact ? 'h-2' : 'h-3';
-  const fontSize = compact ? 'text-[10px]' : 'text-[11px]';
+  const labelCol = compact ? '5.25rem' : '5.75rem';
+  const countCol = compact ? '3rem' : '4.25rem';
+  const barH = compact ? 'h-2' : 'h-3.5';
+  const fontSize = compact ? 'text-[10px]' : 'text-[13px]';
+  const rowGap = compact ? '0.5rem' : '0.4rem';
   return (
     <div className={`flex flex-col ${compact ? 'gap-1' : 'gap-1.5'}`}>
       {buckets.map((b, i) => {
@@ -774,9 +776,12 @@ function GroupedBars({
                 }}
               />
             </div>
-            <span className={`${fontSize} tabular-nums text-right`} style={{ color: 'var(--text-muted)' }}>
-              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{b.count}</span>
-              <span className="ml-1">{pct}%</span>
+            <span
+              className={`${fontSize} tabular-nums grid whitespace-nowrap`}
+              style={{ color: 'var(--text-muted)', gridTemplateColumns: '1fr 1fr', columnGap: '0.4rem' }}
+            >
+              <span className="text-right font-semibold" style={{ color: 'var(--text-primary)' }}>{b.count}</span>
+              <span className="text-right">({pct}%)</span>
             </span>
           </>
         );
@@ -786,8 +791,8 @@ function GroupedBars({
               key={b.letter}
               prefetch
               href={drillHref}
-              className="grid items-center gap-2 rounded-md px-1 py-0.5 -mx-1 hover:bg-[var(--accent-hover,var(--page-bg))] transition-colors cursor-pointer"
-              style={{ gridTemplateColumns: `${labelCol} 1fr 3rem`, color: 'inherit', textDecoration: 'none' }}
+              className="grid items-center rounded-md px-1 py-0.5 -mx-1 hover:bg-[var(--accent-hover,var(--page-bg))] transition-colors cursor-pointer"
+              style={{ gridTemplateColumns: `${labelCol} 1fr ${countCol}`, columnGap: rowGap, color: 'inherit', textDecoration: 'none' }}
               title={`${labels[i]} — ${optionText}: ${b.count} (${pct}%). Click to see respondents.`}
             >
               {content}
@@ -797,8 +802,8 @@ function GroupedBars({
         return (
           <div
             key={b.letter}
-            className="grid items-center gap-2"
-            style={{ gridTemplateColumns: `${labelCol} 1fr 3rem` }}
+            className="grid items-center"
+            style={{ gridTemplateColumns: `${labelCol} 1fr ${countCol}`, columnGap: rowGap }}
             title={`${labels[i]}${optionText ? ` — ${optionText}` : ''}: ${b.count} (${pct}%)`}
           >
             {content}
