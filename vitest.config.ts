@@ -11,13 +11,13 @@ export default defineConfig({
       include: ['lib/**/*.ts'],
       exclude: ['lib/**/*.test.ts', 'lib/**/*.d.ts'],
       // Ratchet floor: only ever bump these UP.
-      // Current measured: stmts 31.7 / branches 29.8 / fns 38.1 / lines 30.8.
-      // Floor sits just below so a regression of >2 percentage points fails CI.
+      // Current measured: stmts 62.5 / branches 55.7 / fns 70.1 / lines 62.
+      // Floor sits ~2pp below so a regression of more than that fails CI.
       thresholds: {
-        statements: 28,
-        branches: 25,
-        functions: 35,
-        lines: 28,
+        statements: 60,
+        branches: 52,
+        functions: 67,
+        lines: 60,
       },
     },
   },
