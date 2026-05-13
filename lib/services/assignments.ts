@@ -19,7 +19,10 @@ export type AssignmentQuestionInput = {
 export type SyncAssignmentsInput = {
   campaignId: string;
   employeeIds: string[];
-  questions: AssignmentQuestionInput[];
+  // Omit `questions` (or pass `undefined`) to leave the campaign's question
+  // set — including each row's groupId/audience/targets — untouched. The
+  // recipients page uses this; the questions page passes the full set.
+  questions?: AssignmentQuestionInput[];
   actorId: string;
   actorEmail: string;
 };
@@ -28,7 +31,13 @@ export async function syncCampaignAssignments(input: SyncAssignmentsInput) {
   const { campaignId, employeeIds, questions } = input;
   const empSet = new Set(employeeIds);
 
-  const stats = { added: 0, removed: 0, kept: 0, questions: questions.length };
+  const stats = {
+    added: 0,
+    removed: 0,
+    kept: 0,
+    questions: questions?.length ?? 0,
+    questionsTouched: questions !== undefined,
+  };
 
   await prisma.$transaction(async (tx) => {
     const existing = await tx.campaignAssignment.findMany({
@@ -53,26 +62,29 @@ export async function syncCampaignAssignments(input: SyncAssignmentsInput) {
       stats.removed = toRemove.length;
     }
 
-    // Question set is replaced wholesale — order and audience can change
-    // arbitrarily on every save and the diff would be more code than it saves.
-    await tx.campaignQuestion.deleteMany({ where: { campaignId } });
-    for (const q of questions) {
-      const cq = await tx.campaignQuestion.create({
-        data: {
-          campaignId,
-          questionId: q.questionId,
-          order: q.order,
-          audience: q.audience,
-          groupId: q.groupId ?? null,
-        },
-      });
-      if (q.audience === Audience.SPECIFIC && q.employeeIds && q.employeeIds.length > 0) {
-        await tx.campaignQuestionEmployee.createMany({
-          data: q.employeeIds
-            .filter((e) => empSet.has(e))
-            .map((employeeId) => ({ campaignQuestionId: cq.id, employeeId })),
-          skipDuplicates: true,
+    // Question set is replaced wholesale only when the caller actually
+    // manages questions (the questions builder). Recipients-only saves omit
+    // the field and we leave question rows — including groupId — alone.
+    if (questions !== undefined) {
+      await tx.campaignQuestion.deleteMany({ where: { campaignId } });
+      for (const q of questions) {
+        const cq = await tx.campaignQuestion.create({
+          data: {
+            campaignId,
+            questionId: q.questionId,
+            order: q.order,
+            audience: q.audience,
+            groupId: q.groupId ?? null,
+          },
         });
+        if (q.audience === Audience.SPECIFIC && q.employeeIds && q.employeeIds.length > 0) {
+          await tx.campaignQuestionEmployee.createMany({
+            data: q.employeeIds
+              .filter((e) => empSet.has(e))
+              .map((employeeId) => ({ campaignQuestionId: cq.id, employeeId })),
+            skipDuplicates: true,
+          });
+        }
       }
     }
   });

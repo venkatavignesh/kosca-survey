@@ -94,6 +94,22 @@ describe('syncCampaignAssignments', () => {
     expect(data).toEqual([{ campaignQuestionId: 'cq2', employeeId: 'e1' }]);
   });
 
+  it('leaves the question set untouched when questions is omitted', async () => {
+    txCA.findMany.mockResolvedValueOnce([]);
+
+    await syncCampaignAssignments({
+      campaignId: 'c1',
+      employeeIds: ['e1'],
+      // questions intentionally omitted — recipients-only save
+      actorId: 'u',
+      actorEmail: 'a',
+    });
+
+    expect(txCQ.deleteMany).not.toHaveBeenCalled();
+    expect(txCQ.create).not.toHaveBeenCalled();
+    expect(txCQE.createMany).not.toHaveBeenCalled();
+  });
+
   it('audits the sync with the resulting stats', async () => {
     txCA.findMany.mockResolvedValueOnce([]);
     txCQ.create.mockResolvedValue({ id: 'cq1' });

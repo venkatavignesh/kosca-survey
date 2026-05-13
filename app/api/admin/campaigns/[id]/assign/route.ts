@@ -6,15 +6,20 @@ import { syncCampaignAssignments } from '@/lib/services/assignments';
 
 const Body = z.object({
   employeeIds: z.array(z.string()).min(0),
-  questions: z.array(
-    z.object({
-      questionId: z.string(),
-      order: z.number().int(),
-      audience: z.nativeEnum(Audience),
-      groupId: z.string().nullable().optional(),
-      employeeIds: z.array(z.string()).optional(),
-    }),
-  ),
+  // Omit `questions` from the body to leave the campaign's question set
+  // untouched (recipients page does this). Pass an array to replace it
+  // (questions page does this).
+  questions: z
+    .array(
+      z.object({
+        questionId: z.string(),
+        order: z.number().int(),
+        audience: z.nativeEnum(Audience),
+        groupId: z.string().nullable().optional(),
+        employeeIds: z.array(z.string()).optional(),
+      }),
+    )
+    .optional(),
 });
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {

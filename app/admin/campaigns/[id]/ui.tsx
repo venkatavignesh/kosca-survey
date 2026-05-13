@@ -184,14 +184,10 @@ export function RecipientsBuilder({ campaign, employees, locations, officeTypes,
         const res = await fetch(`/api/admin/campaigns/${campaign.id}/assign`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          // Recipients-only save: omit `questions` so the server preserves
+          // each row's groupId/audience/targets (managed on the questions page).
           body: JSON.stringify({
             employeeIds: Array.from(effectiveSelected),
-            questions: campaign.questions.map((cq) => ({
-              questionId: cq.questionId,
-              order: cq.order,
-              audience: cq.audience,
-              employeeIds: cq.audience === 'SPECIFIC' ? cq.targetEmployeeIds : [],
-            })),
           }),
         });
         if (!res.ok) {
